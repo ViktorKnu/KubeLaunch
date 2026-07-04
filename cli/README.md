@@ -13,14 +13,18 @@ python -m pip install -e ".[dev]"
 kube-launch --help
 ```
 
-Kommandoene sjekker foreløpig at `kubectl`, `k3d` og `helm` finnes i `PATH`.
-Opprettelse og sletting av cluster kommer i milepæl 2.
+Kommandoene sjekker at nødvendige verktøy finnes i `PATH`. Clusteret heter
+`kubelaunch`, og Kubernetes-konteksten er `k3d-kubelaunch`.
 
 ```console
 kube-launch up --minimal
 kube-launch status
 kube-launch down
 ```
+
+`up --minimal` er idempotent og lar et eksisterende cluster være i fred.
+`status` sjekker både om clusteret finnes og om Kubernetes API-et svarer.
+`down` ber om bekreftelse; bruk `down --yes` i automatiserte kjøringer.
 
 Tester og lint kjøres slik:
 

@@ -42,25 +42,104 @@ def test_up_reports_all_missing_tools(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "[MISSING] helm" in result.stdout
 
 
-def test_up_validates_without_changing_host(tools_available: None) -> None:
+def test_up_creates_cluster(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    created: list[bool] = []
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: False)
+    monkeypatch.setattr("kube_launch.main.create_cluster", lambda: created.append(True))
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+
     result = runner.invoke(app, ["up", "--minimal"])
 
     assert result.exit_code == 0
-    assert "Host validation passed." in result.stdout
-    assert "No changes were made." in result.stdout
+    assert created == [True]
+    assert "Cluster 'kubelaunch' created." in result.stdout
+    assert "Kubernetes API is reachable." in result.stdout
 
 
-def test_status_shows_planned_components(tools_available: None) -> None:
+def test_up_keeps_existing_cluster_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.create_cluster",
+        lambda: pytest.fail("existing cluster must not be recreated"),
+    )
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+
+    result = runner.invoke(app, ["up", "--minimal"])
+
+    assert result.exit_code == 0
+    assert "already exists; leaving it unchanged" in result.stdout
+
+
+def test_status_reports_reachable_cluster(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+
     result = runner.invoke(app, ["status"])
 
     assert result.exit_code == 0
-    assert "Cluster: not managed yet (Milestone 2)" in result.stdout
-    assert "Argo CD: not managed yet (Milestone 3)" in result.stdout
+    assert "Cluster 'kubelaunch': exists" in result.stdout
+    assert "Kubernetes API: reachable" in result.stdout
 
 
-def test_down_is_an_explicit_no_op(tools_available: None) -> None:
+def test_status_reports_missing_cluster(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: False)
+
+    result = runner.invoke(app, ["status"])
+
+    assert result.exit_code == 1
+    assert "Cluster 'kubelaunch': not found" in result.stdout
+
+
+def test_down_is_idempotent_when_cluster_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: False)
+
     result = runner.invoke(app, ["down"])
 
     assert result.exit_code == 0
-    assert "cleanup is not implemented yet" in result.stdout
-    assert "No changes were made." in result.stdout
+    assert "Nothing to remove." in result.stdout
+
+
+def test_down_deletes_cluster_with_yes_flag(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    deleted: list[bool] = []
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.delete_cluster", lambda: deleted.append(True))
+
+    result = runner.invoke(app, ["down", "--yes"])
+
+    assert result.exit_code == 0
+    assert deleted == [True]
+    assert "Cluster 'kubelaunch' deleted." in result.stdout
+
+
+def test_down_can_be_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.delete_cluster",
+        lambda: pytest.fail("cancelled deletion must not run"),
+    )
+
+    result = runner.invoke(app, ["down"], input="n\n")
+
+    assert result.exit_code == 1
+    assert "Aborted" in result.output
