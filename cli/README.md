@@ -1,20 +1,20 @@
 # CLI
 
-The Python/Typer `kube-launch` CLI owns local cluster lifecycle, Argo CD
-bootstrap, and platform status reporting. It does not install individual
-platform components.
+`kube-launch` er skrevet i Python med Typer. CLI-et skal håndtere livsløpet til
+det lokale clusteret, bootstrap av Argo CD og en samlet status for plattformen.
+Det skal ikke installere hver enkelt plattformkomponent direkte.
 
-## Local development
+## Lokal utvikling
 
-From the repository root:
+Kjør dette fra roten av repoet:
 
 ```console
 python -m pip install -e ".[dev]"
 kube-launch --help
 ```
 
-The Milestone 1 commands validate that `kubectl`, `k3d`, and `helm` are present
-on `PATH`. They do not create, inspect, or delete a cluster yet.
+Kommandoene sjekker foreløpig at `kubectl`, `k3d` og `helm` finnes i `PATH`.
+Opprettelse og sletting av cluster kommer i milepæl 2.
 
 ```console
 kube-launch up --minimal
@@ -22,7 +22,7 @@ kube-launch status
 kube-launch down
 ```
 
-Run the checks with:
+Tester og lint kjøres slik:
 
 ```console
 python -m pytest

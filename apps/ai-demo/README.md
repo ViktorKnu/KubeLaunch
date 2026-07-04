@@ -1,5 +1,4 @@
-# AI demo
+# AI-demo
 
-The demo application will eventually contain a FastAPI backend, a small web
-frontend, container definitions, and declarative Kubernetes deployment files.
-It is intentionally not implemented in Milestone 0.
+Her skal frontend, FastAPI-backend, Dockerfiles og Kubernetes-oppsettet for
+demoen ligge. Backend og frontend bygges i hver sin milepæl senere i prosjektet.

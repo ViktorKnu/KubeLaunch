@@ -1,5 +1,5 @@
-# Platform
+# Plattform
 
-This directory is the future GitOps entry point. Argo CD will reconcile a root
-app-of-apps definition here; the CLI will not imperatively install individual
-platform components.
+Denne mappen blir inngangen til GitOps-oppsettet. Argo CD skal lese en root
+app-of-apps herfra og synkronisere resten av plattformen. CLI-et skal ikke
+installere komponentene én etter én.

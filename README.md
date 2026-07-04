@@ -1,76 +1,77 @@
 # KubeLaunch
 
-KubeLaunch is a GitOps-native Kubernetes platform bootstrapper for AI-ready
-workloads. One command will create a local Kubernetes platform running a small
-AI demo, observability, and autoscaling.
+KubeLaunch setter opp en lokal Kubernetes-plattform for en liten AI-demo. Målet
+er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
+sammen, uten at prosjektet blir unødvendig stort.
 
-> **Project status:** the CLI skeleton and prerequisite checks are available.
-> Cluster and platform operations are not implemented yet.
+> **Status:** CLI-grunnlaget og sjekk av lokale verktøy er på plass. Opprettelse
+> av cluster og installasjon av plattformen kommer i senere milepæler.
 
-## Why KubeLaunch?
+## Hvorfor dette prosjektet?
 
-Running an AI workload locally is easy to demonstrate in isolation. Running it
-as a small, understandable platform—with declarative delivery, useful metrics,
-and workload-aware scaling—is harder. KubeLaunch is intended to make that path
-reproducible without hiding the Kubernetes and GitOps concepts it demonstrates.
+Det er ganske enkelt å kjøre en AI-modell lokalt. Det blir fort mer uoversiktlig
+når modellen også skal pakkes inn i en applikasjon, overvåkes og skaleres i
+Kubernetes. KubeLaunch samler disse delene i et lite prosjekt hvor oppsettet er
+synlig og mulig å forstå.
 
-## MVP goals
+CLI-et skal bare gjøre det som trengs for å komme i gang: opprette et lokalt
+cluster, installere Argo CD og legge inn én root Application. Etter det tar Argo
+CD over. Resten av plattformen skal altså ligge i Git, ikke i et langt script
+med `helm install`-kommandoer.
 
-- Create a local Kubernetes cluster with k3d.
-- Bootstrap Argo CD and one root Application from a small CLI.
-- Let Argo CD manage the rest of the platform through app-of-apps.
-- Run a CPU-friendly Ollama model as one stable AI runtime.
-- Provide a simple prompt UI backed by FastAPI.
-- Observe the platform with Prometheus and Grafana.
-- Autoscale the API workload with KEDA (not the Ollama runtime).
-- Keep the complete local demo understandable and easy to tear down.
+## Dette skal være med i første versjon
 
-## Not in the MVP
+- lokalt Kubernetes-cluster med k3d
+- Argo CD med app-of-apps
+- en liten Ollama-modell som kjører på CPU
+- enkel frontend og FastAPI-backend for å sende inn en prompt
+- metrics i Prometheus og Grafana
+- autoskalering av backend med KEDA
+- kommandoer for å starte, sjekke og rydde bort miljøet
 
-- cert-manager or automated TLS
-- External Secrets or Vault integration
-- an `AIWorkload` CRD/operator
-- vLLM and alternative inference runtimes
-- canary model rollouts
-- cloud deployment automation
+KEDA skal skalere backend, ikke Ollama. Ollama skal være én stabil runtime slik
+at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 
-These are candidates for a future `--full` mode or a post-MVP release. See the
-[roadmap](docs/README.md#roadmap).
+## Dette venter til senere
 
-## Architecture
+- cert-manager og automatisk TLS
+- External Secrets og Vault-integrasjon
+- `AIWorkload` CRD og operator
+- vLLM som alternativ runtime
+- canary-utrulling av modeller
+- automatisk oppsett i skyen
+
+Se [videre plan](docs/README.md#videre-plan) for rekkefølgen på milepælene.
+
+## Arkitektur
 
 ```mermaid
 flowchart TD
-    User["Developer"] --> CLI["kube-launch CLI"]
-    CLI --> Cluster["Local k3d cluster"]
+    User["Utvikler"] --> CLI["kube-launch CLI"]
+    CLI --> Cluster["Lokalt k3d-cluster"]
     CLI --> Argo["Argo CD + root Application"]
-    Git["Git repository: platform/"] --> Argo
+    Git["Git-repo: platform/"] --> Argo
     Argo --> Obs["Prometheus + Grafana"]
     Argo --> Keda["KEDA"]
     Argo --> Ollama["Ollama runtime"]
-    Argo --> Demo["AI demo: frontend + FastAPI"]
-    Keda -->|"scales API only"| Demo
-    Demo -->|"prompt / response"| Ollama
-    Obs -->|"scrapes metrics"| Demo
+    Argo --> Demo["AI-demo: frontend + FastAPI"]
+    Keda -->|"skalerer bare backend"| Demo
+    Demo -->|"prompt og svar"| Ollama
+    Obs -->|"henter metrics"| Demo
 ```
 
-The CLI has a deliberately narrow responsibility: create the local cluster,
-bootstrap Argo CD, and apply one root Argo CD Application. Platform components
-are reconciled from Git by Argo CD rather than installed imperatively by the
-CLI.
+## Kom i gang med CLI-et
 
-## CLI quickstart
-
-Install the CLI in an isolated Python environment:
+Lag gjerne et eget Python-miljø før du installerer prosjektet:
 
 ```console
 python -m venv .venv
-# Activate .venv using the command for your shell
+# Aktiver .venv med kommandoen som passer skallet ditt
 python -m pip install -e ".[dev]"
 ```
 
-The current commands validate that `kubectl`, `k3d`, and `helm` are available.
-They report planned platform state without making cluster changes.
+Foreløpig sjekker kommandoene om `kubectl`, `k3d` og `helm` finnes. De gjør
+ingen endringer i Kubernetes ennå.
 
 ```console
 kube-launch up --minimal
@@ -78,28 +79,28 @@ kube-launch status
 kube-launch down
 ```
 
-Run `make help` to see the equivalent development tasks.
+Kjør `make help` for å se de samme oppgavene via Makefile.
 
-## Repository layout
+## Mappestruktur
 
 ```text
 .
-|-- cli/                   # Python/Typer kube-launch CLI (Milestone 1+)
-|-- platform/              # Root app and GitOps-managed platform definitions
-|   `-- components/        # Argo CD Applications for platform components
+|-- cli/                   # CLI skrevet med Python og Typer
+|-- platform/              # Root app og GitOps-oppsett
+|   `-- components/        # Argo CD Applications for hver komponent
 |-- apps/
-|   `-- ai-demo/           # Demo frontend, backend, and deployment definitions
-|-- docs/                  # Architecture, demo notes, and roadmap
-|-- scripts/               # Small local development helpers, when needed
-|-- .github/workflows/     # CI workflows (Milestone 12)
-`-- Makefile               # Stable developer entry points
+|   `-- ai-demo/           # Frontend, backend og Kubernetes-oppsett
+|-- docs/                  # Arkitektur, demo-notater og videre plan
+|-- scripts/               # Små hjelpere for lokal testing
+|-- .github/workflows/     # CI kommer i milepæl 12
+`-- Makefile               # Faste kommandoer for utvikling
 ```
 
-Python with [Typer](https://typer.tiangolo.com/) is the planned CLI stack. It
-keeps the bootstrap code compact and testable while leaving all ongoing
-platform reconciliation to Argo CD.
+CLI-et skrives i Python med [Typer](https://typer.tiangolo.com/). Det holder
+bootstrap-koden liten og enkel å teste, mens Argo CD får ansvaret for den
+løpende synkroniseringen av plattformen.
 
-## Development
+## Utvikling
 
 ```console
 make help
@@ -108,9 +109,9 @@ make lint
 make validate
 ```
 
-The test and lint tasks run the CLI checks. Platform validation remains a no-op
-until declarative platform definitions are introduced.
+`test` og `lint` kjører kontrollene for CLI-et. `validate` er foreløpig en
+placeholder og tas i bruk når de første plattformfilene kommer.
 
-## License
+## Lisens
 
-No license has been selected yet.
+Prosjektet har ikke fått en lisens ennå.

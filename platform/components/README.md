@@ -1,4 +1,4 @@
-# Platform components
+# Plattformkomponenter
 
-Argo CD Application definitions for observability, KEDA, Ollama, and the AI
-demo will be introduced here in separate milestones.
+Her kommer Argo CD Applications for Prometheus og Grafana, KEDA, Ollama og
+AI-demoen. De legges til én milepæl om gangen.
