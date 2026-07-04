@@ -4,8 +4,8 @@ KubeLaunch setter opp en lokal Kubernetes-plattform for en liten AI-demo. Målet
 er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
 
-> **Status:** CLI-et kan opprette, kontrollere og slette et lokalt k3d-cluster.
-> Installasjon av Argo CD og resten av plattformen kommer i senere milepæler.
+> **Status:** CLI-et kan opprette et lokalt k3d-cluster, installere Argo CD og
+> legge inn root Application. Plattformkomponentene kommer i senere milepæler.
 
 ## Hvorfor dette prosjektet?
 
@@ -71,7 +71,8 @@ python -m pip install -e ".[dev]"
 ```
 
 Kommandoene sjekker først om nødvendige verktøy finnes. `up` oppretter clusteret
-bare hvis det mangler, mens `down` ber om bekreftelse før det slettes.
+bare hvis det mangler, installerer eller oppdaterer Argo CD og legger inn root
+Application. `down` ber om bekreftelse før hele clusteret slettes.
 
 ```console
 kube-launch up --minimal

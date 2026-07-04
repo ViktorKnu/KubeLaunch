@@ -2,6 +2,13 @@
 
 import typer
 
+from kube_launch.argocd import (
+    ArgoCDCommandError,
+    apply_root_application,
+    argocd_status,
+    install_argocd,
+    root_application_exists,
+)
 from kube_launch.cluster import (
     CLUSTER_NAME,
     ClusterCommandError,
@@ -41,6 +48,10 @@ def _check_prerequisites(tool_names: tuple[str, ...] = REQUIRED_TOOLS) -> bool:
 
 def _print_cluster_error(error: ClusterCommandError) -> None:
     typer.secho(f"Cluster operation failed: {error}", fg=typer.colors.RED, err=True)
+
+
+def _print_argocd_error(error: ArgoCDCommandError) -> None:
+    typer.secho(f"Argo CD bootstrap failed: {error}", fg=typer.colors.RED, err=True)
 
 
 @app.command()
@@ -88,7 +99,16 @@ def up(
         raise typer.Exit(code=1) from error
 
     typer.secho("Kubernetes API is reachable.", fg=typer.colors.GREEN)
-    typer.echo("Argo CD bootstrap is not implemented yet (Milestone 3).")
+
+    try:
+        typer.echo("Installing or updating Argo CD...")
+        install_argocd()
+        typer.secho("Argo CD is ready.", fg=typer.colors.GREEN)
+        apply_root_application()
+        typer.secho("Root Argo CD Application applied.", fg=typer.colors.GREEN)
+    except ArgoCDCommandError as error:
+        _print_argocd_error(error)
+        raise typer.Exit(code=1) from error
 
 
 @app.command()
@@ -121,8 +141,29 @@ def status() -> None:
         _print_cluster_error(error)
         raise typer.Exit(code=1) from error
 
-    typer.echo("Argo CD: not managed yet (Milestone 3)")
-    if not tools_ready or not reachable:
+    try:
+        argo = argocd_status()
+        if not argo.installed:
+            typer.echo("Argo CD: not installed")
+            raise typer.Exit(code=1)
+        if argo.ready:
+            typer.secho(
+                f"Argo CD: ready ({argo.ready_replicas}/{argo.desired_replicas})",
+                fg=typer.colors.GREEN,
+            )
+        else:
+            typer.secho(
+                f"Argo CD: not ready ({argo.ready_replicas}/{argo.desired_replicas})",
+                fg=typer.colors.RED,
+            )
+
+        root_exists = root_application_exists()
+        typer.echo(f"Root Application: {'applied' if root_exists else 'missing'}")
+    except ArgoCDCommandError as error:
+        _print_argocd_error(error)
+        raise typer.Exit(code=1) from error
+
+    if not tools_ready or not reachable or not argo.ready or not root_exists:
         raise typer.Exit(code=1)
 
 

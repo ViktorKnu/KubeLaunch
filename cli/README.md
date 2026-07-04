@@ -26,6 +26,11 @@ kube-launch down
 `status` sjekker både om clusteret finnes og om Kubernetes API-et svarer.
 `down` ber om bekreftelse; bruk `down --yes` i automatiserte kjøringer.
 
+Når clusteret er klart, installerer `up` Argo CD med Helm og venter til
+installasjonen er klar. Til slutt legges `platform/root-application.yaml` inn i
+clusteret. Root Application peker på `platform/` i dette repoet; alle andre
+komponenter skal etter hvert synkroniseres av Argo CD.
+
 Tester og lint kjøres slik:
 
 ```console

@@ -32,4 +32,4 @@ lint:
 	python -m ruff check .
 
 validate:
-	@echo "No platform definitions are available to validate yet."
+	python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('platform/root-application.yaml').read_text(encoding='utf-8')); print('Platform YAML is valid.')"

@@ -1,5 +1,5 @@
 # Plattform
 
-Denne mappen blir inngangen til GitOps-oppsettet. Argo CD skal lese en root
-app-of-apps herfra og synkronisere resten av plattformen. CLI-et skal ikke
-installere komponentene én etter én.
+Denne mappen er inngangen til GitOps-oppsettet. CLI-et legger inn
+`root-application.yaml`, og Argo CD synkroniserer resten av plattformen herfra.
+CLI-et skal ikke installere komponentene én etter én.

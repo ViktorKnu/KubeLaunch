@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from kube_launch.argocd import ArgoCDStatus
 from kube_launch.main import app
 from typer.testing import CliRunner
 
@@ -13,6 +14,29 @@ def tools_available(monkeypatch: pytest.MonkeyPatch) -> None:
         "kube_launch.prerequisites.which",
         lambda name: str(Path("tools") / name),
     )
+
+
+@pytest.fixture
+def argocd_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "kube_launch.main.argocd_status",
+        lambda: ArgoCDStatus(True, True, 1, 1),
+    )
+    monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
+
+
+@pytest.fixture
+def bootstrap_spy(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "kube_launch.main.install_argocd",
+        lambda: calls.append("install"),
+    )
+    monkeypatch.setattr(
+        "kube_launch.main.apply_root_application",
+        lambda: calls.append("apply-root"),
+    )
+    return calls
 
 
 def test_help_lists_commands() -> None:
@@ -45,6 +69,7 @@ def test_up_reports_all_missing_tools(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_up_creates_cluster(
     monkeypatch: pytest.MonkeyPatch,
     tools_available: None,
+    bootstrap_spy: list[str],
 ) -> None:
     created: list[bool] = []
     monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: False)
@@ -55,6 +80,7 @@ def test_up_creates_cluster(
 
     assert result.exit_code == 0
     assert created == [True]
+    assert bootstrap_spy == ["install", "apply-root"]
     assert "Cluster 'kubelaunch' created." in result.stdout
     assert "Kubernetes API is reachable." in result.stdout
 
@@ -62,6 +88,7 @@ def test_up_creates_cluster(
 def test_up_keeps_existing_cluster_unchanged(
     monkeypatch: pytest.MonkeyPatch,
     tools_available: None,
+    bootstrap_spy: list[str],
 ) -> None:
     monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
     monkeypatch.setattr(
@@ -74,11 +101,13 @@ def test_up_keeps_existing_cluster_unchanged(
 
     assert result.exit_code == 0
     assert "already exists; leaving it unchanged" in result.stdout
+    assert bootstrap_spy == ["install", "apply-root"]
 
 
 def test_status_reports_reachable_cluster(
     monkeypatch: pytest.MonkeyPatch,
     tools_available: None,
+    argocd_ready: None,
 ) -> None:
     monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
     monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
@@ -88,6 +117,8 @@ def test_status_reports_reachable_cluster(
     assert result.exit_code == 0
     assert "Cluster 'kubelaunch': exists" in result.stdout
     assert "Kubernetes API: reachable" in result.stdout
+    assert "Argo CD: ready (1/1)" in result.stdout
+    assert "Root Application: applied" in result.stdout
 
 
 def test_status_reports_missing_cluster(
@@ -100,6 +131,23 @@ def test_status_reports_missing_cluster(
 
     assert result.exit_code == 1
     assert "Cluster 'kubelaunch': not found" in result.stdout
+
+
+def test_status_reports_missing_argocd(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.argocd_status",
+        lambda: ArgoCDStatus(False, False),
+    )
+
+    result = runner.invoke(app, ["status"])
+
+    assert result.exit_code == 1
+    assert "Argo CD: not installed" in result.stdout
 
 
 def test_down_is_idempotent_when_cluster_is_missing(
