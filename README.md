@@ -4,8 +4,8 @@ KubeLaunch is a GitOps-native Kubernetes platform bootstrapper for AI-ready
 workloads. One command will create a local Kubernetes platform running a small
 AI demo, observability, and autoscaling.
 
-> **Project status:** early scaffolding. No cluster or platform components are
-> installed yet.
+> **Project status:** the CLI skeleton and prerequisite checks are available.
+> Cluster and platform operations are not implemented yet.
 
 ## Why KubeLaunch?
 
@@ -59,10 +59,18 @@ bootstrap Argo CD, and apply one root Argo CD Application. Platform components
 are reconciled from Git by Argo CD rather than installed imperatively by the
 CLI.
 
-## Planned quickstart
+## CLI quickstart
 
-The commands below describe the intended interface; they are not implemented
-yet.
+Install the CLI in an isolated Python environment:
+
+```console
+python -m venv .venv
+# Activate .venv using the command for your shell
+python -m pip install -e ".[dev]"
+```
+
+The current commands validate that `kubectl`, `k3d`, and `helm` are available.
+They report planned platform state without making cluster changes.
 
 ```console
 kube-launch up --minimal
@@ -70,8 +78,7 @@ kube-launch status
 kube-launch down
 ```
 
-Until the CLI exists, run `make help` to see the current project tasks. Tasks
-that belong to later milestones exit with a clear placeholder message.
+Run `make help` to see the equivalent development tasks.
 
 ## Repository layout
 
@@ -101,9 +108,8 @@ make lint
 make validate
 ```
 
-The test, lint, and validation tasks are intentionally no-ops until their
-respective project code is introduced. They provide stable entry points for
-future milestones without pretending that checks already exist.
+The test and lint tasks run the CLI checks. Platform validation remains a no-op
+until declarative platform definitions are introduced.
 
 ## License
 

@@ -5,22 +5,31 @@
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
 	@echo ""
-	@echo "  make setup      Prepare the local development environment (planned)"
-	@echo "  make up         Start the minimal local platform (planned)"
-	@echo "  make status     Show local platform status (planned)"
-	@echo "  make down       Remove the local platform (planned)"
+	@echo "  make setup      Install the CLI and development dependencies"
+	@echo "  make up         Validate the host for the minimal platform"
+	@echo "  make status     Show local platform status"
+	@echo "  make down       Run the platform cleanup command"
 	@echo "  make test       Run available tests"
 	@echo "  make lint       Run available linters"
 	@echo "  make validate   Validate platform definitions"
 
-setup up status down:
-	@echo "$@ is not implemented yet; see the milestone plan in docs/README.md."
+setup:
+	python -m pip install -e ".[dev]"
+
+up:
+	kube-launch up --minimal
+
+status:
+	kube-launch status
+
+down:
+	kube-launch down
 
 test:
-	@echo "No tests are defined yet."
+	python -m pytest
 
 lint:
-	@echo "No linters are configured yet."
+	python -m ruff check .
 
 validate:
 	@echo "No platform definitions are available to validate yet."
