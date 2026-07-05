@@ -4,8 +4,9 @@ KubeLaunch setter opp en lokal Kubernetes-plattform for en liten AI-demo. Målet
 er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
 
-> **Status:** CLI-et kan opprette et lokalt k3d-cluster, installere Argo CD og
-> legge inn root Application. Plattformkomponentene kommer i senere milepæler.
+> **Status:** CLI-et kan opprette et lokalt k3d-cluster og installere Argo CD.
+> App-of-apps-flyten er koblet opp med en liten smoke test. De faktiske
+> plattformkomponentene kommer i senere milepæler.
 
 ## Hvorfor dette prosjektet?
 
@@ -55,6 +56,7 @@ flowchart TD
     Argo --> Keda["KEDA"]
     Argo --> Ollama["Ollama runtime"]
     Argo --> Demo["AI-demo: frontend + FastAPI"]
+    Argo --> Smoke["Smoke test"]
     Keda -->|"skalerer bare backend"| Demo
     Demo -->|"prompt og svar"| Ollama
     Obs -->|"henter metrics"| Demo
@@ -91,7 +93,8 @@ Kjør `make help` for å se de samme oppgavene via Makefile.
 |-- platform/              # Root app og GitOps-oppsett
 |   `-- components/        # Argo CD Applications for hver komponent
 |-- apps/
-|   `-- ai-demo/           # Frontend, backend og Kubernetes-oppsett
+|   |-- ai-demo/           # Frontend, backend og Kubernetes-oppsett
+|   `-- platform-smoke-test/ # Enkel test av GitOps-flyten
 |-- docs/                  # Arkitektur, demo-notater og videre plan
 |-- scripts/               # Små hjelpere for lokal testing
 |-- .github/workflows/     # CI kommer i milepæl 12
@@ -101,6 +104,24 @@ Kjør `make help` for å se de samme oppgavene via Makefile.
 CLI-et skrives i Python med [Typer](https://typer.tiangolo.com/). Det holder
 bootstrap-koden liten og enkel å teste, mens Argo CD får ansvaret for den
 løpende synkroniseringen av plattformen.
+
+## Slik går endringer fra Git til clusteret
+
+1. `kube-launch up --minimal` legger inn `platform/root-application.yaml`.
+2. Root Application leser Application-filene under `platform/components/`.
+3. Hver child Application peker videre på sin egen mappe under `apps/`.
+4. Argo CD renderer Kustomize-filene og synkroniserer dem til clusteret.
+
+Den første child Application er `platform-smoke-test`. Den kjører én liten
+nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten
+før Prometheus, KEDA og Ollama legges til.
+
+Etter at endringene er pushet og Argo CD har synkronisert, kan testen sjekkes
+slik:
+
+```console
+kubectl --context k3d-kubelaunch -n kubelaunch-system get deployment,service
+```
 
 ## Utvikling
 

@@ -1,4 +1,5 @@
 # Plattformkomponenter
 
-Her kommer Argo CD Applications for Prometheus og Grafana, KEDA, Ollama og
-AI-demoen. De legges til én milepæl om gangen.
+Hver YAML-fil her beskriver én child Application som Argo CD skal håndtere.
+Første komponent er en liten smoke test; Prometheus og Grafana, KEDA, Ollama og
+AI-demoen legges til i egne milepæler.

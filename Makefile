@@ -32,4 +32,5 @@ lint:
 	python -m ruff check .
 
 validate:
-	python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('platform/root-application.yaml').read_text(encoding='utf-8')); print('Platform YAML is valid.')"
+	python scripts/validate_manifests.py
+	kubectl kustomize apps/platform-smoke-test
