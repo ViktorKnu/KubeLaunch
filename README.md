@@ -95,6 +95,7 @@ Kjør `make help` for å se de samme oppgavene via Makefile.
 |-- apps/
 |   |-- ai-demo/           # Frontend, backend og Kubernetes-oppsett
 |   |-- keda-smoke-test/   # Isolert test av autoskalering
+|   |-- ollama/            # Stabil lokal AI-runtime og modellager
 |   `-- platform-smoke-test/ # Enkel test av GitOps-flyten
 |-- docs/                  # Arkitektur, demo-notater og videre plan
 |-- scripts/               # Små hjelpere for lokal testing
@@ -173,6 +174,35 @@ Etter en liten stund skal antall replikaer øke. Stopp lastgeneratoren med
 Denne testen skalerer bare dummy-appen. Ollama skal senere kjøre stabilt med én
 replika.
 
+## Test Ollama direkte
+
+Ollama kjører med én replika og blir ikke skalert av KEDA. Modellen
+`tinyllama` er liten nok til en lokal CPU-demo og lagres på en 3 GiB PVC, slik
+at en omstart av podden ikke utløser en ny nedlasting.
+
+Start port-forward i én terminal:
+
+```console
+make ollama
+# eller:
+kubectl --context k3d-kubelaunch --namespace ollama port-forward service/ollama 11434:11434
+```
+
+Kontroller først at modellen finnes:
+
+```console
+curl.exe http://localhost:11434/api/tags
+```
+
+Send deretter en kort prompt direkte til Ollama:
+
+```console
+curl.exe http://localhost:11434/api/generate -H "Content-Type: application/json" -d '{"model":"tinyllama","prompt":"Svar med én kort setning: Hva er Kubernetes?","stream":false}'
+```
+
+Første svar kan ta litt tid på CPU. Hvis `tinyllama` ikke vises i `/api/tags`,
+sjekk PostSync-jobben og Argo CD-syncen før du tester videre.
+
 ## Utvikling
 
 ```console
@@ -183,7 +213,7 @@ make validate
 ```
 
 `test` og `lint` kjører kontrollene for CLI-et. `validate` sjekker YAML-filene
-og renderer begge Kustomize-appene lokalt.
+og renderer Kustomize-appene lokalt.
 
 ## Lisens
 

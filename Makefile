@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up status down grafana keda-load keda-status test lint validate
+.PHONY: help setup up status down grafana keda-load keda-status ollama test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -12,6 +12,7 @@ help: ## Show available development tasks
 	@echo "  make grafana    Forward Grafana to http://localhost:3000"
 	@echo "  make keda-load  Generate CPU load for the KEDA smoke test"
 	@echo "  make keda-status Show KEDA scaling resources"
+	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make test       Run available tests"
 	@echo "  make lint       Run available linters"
 	@echo "  make validate   Validate platform definitions"
@@ -37,6 +38,9 @@ keda-load:
 keda-status:
 	kubectl --context k3d-kubelaunch --namespace kubelaunch-system get scaledobject,hpa,deployment
 
+ollama:
+	kubectl --context k3d-kubelaunch --namespace ollama port-forward service/ollama 11434:11434
+
 test:
 	python -m pytest
 
@@ -47,3 +51,4 @@ validate:
 	python scripts/validate_manifests.py
 	kubectl kustomize apps/platform-smoke-test
 	kubectl kustomize apps/keda-smoke-test
+	kubectl kustomize apps/ollama

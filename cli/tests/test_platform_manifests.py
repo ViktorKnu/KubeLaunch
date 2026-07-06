@@ -87,8 +87,45 @@ def test_keda_scaled_object_targets_cpu_workload() -> None:
     )
 
 
+def test_ollama_application_points_to_local_runtime() -> None:
+    application = load_yaml("platform/components/ollama-application.yaml")
+
+    assert application["spec"]["source"]["path"] == "apps/ollama"
+    assert application["spec"]["destination"]["namespace"] == "ollama"
+    assert application["spec"]["syncPolicy"]["automated"] == {
+        "prune": True,
+        "selfHeal": True,
+    }
+
+
+def test_ollama_is_one_persistent_cpu_runtime() -> None:
+    deployment = load_yaml("apps/ollama/deployment.yaml")
+    claim = load_yaml("apps/ollama/persistent-volume-claim.yaml")
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+
+    assert deployment["spec"]["replicas"] == 1
+    assert deployment["spec"]["strategy"]["type"] == "Recreate"
+    assert container["image"] == "ollama/ollama:0.31.1"
+    assert container["resources"]["requests"]["memory"] == "768Mi"
+    assert container["volumeMounts"] == [
+        {"name": "models", "mountPath": "/root/.ollama"}
+    ]
+    assert claim["spec"]["resources"]["requests"]["storage"] == "3Gi"
+
+
+def test_ollama_model_pull_is_post_sync_hook() -> None:
+    job = load_yaml("apps/ollama/model-pull-job.yaml")
+    annotations = job["metadata"]["annotations"]
+    container = job["spec"]["template"]["spec"]["containers"][0]
+
+    assert annotations["argocd.argoproj.io/hook"] == "PostSync"
+    assert container["image"] == "ollama/ollama:0.31.1"
+    assert container["args"] == ["pull", "tinyllama"]
+    assert container["env"] == [{"name": "OLLAMA_HOST", "value": "http://ollama:11434"}]
+
+
 def test_kustomization_references_existing_resources() -> None:
-    for app_name in ("platform-smoke-test", "keda-smoke-test"):
+    for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
         app_directory = REPOSITORY_ROOT / "apps" / app_name
         kustomization = load_yaml(f"apps/{app_name}/kustomization.yaml")
 
@@ -97,8 +134,9 @@ def test_kustomization_references_existing_resources() -> None:
 
 
 def test_service_selector_matches_deployment() -> None:
-    deployment = load_yaml("apps/platform-smoke-test/deployment.yaml")
-    service = load_yaml("apps/platform-smoke-test/service.yaml")
+    for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
+        deployment = load_yaml(f"apps/{app_name}/deployment.yaml")
+        service = load_yaml(f"apps/{app_name}/service.yaml")
 
-    pod_labels = deployment["spec"]["template"]["metadata"]["labels"]
-    assert service["spec"]["selector"].items() <= pod_labels.items()
+        pod_labels = deployment["spec"]["template"]["metadata"]["labels"]
+        assert service["spec"]["selector"].items() <= pod_labels.items()
