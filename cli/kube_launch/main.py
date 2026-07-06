@@ -17,6 +17,7 @@ from kube_launch.cluster import (
     cluster_reachable,
     create_cluster,
     delete_cluster,
+    wait_for_cluster,
 )
 from kube_launch.prerequisites import REQUIRED_TOOLS, ToolStatus, check_tools
 
@@ -88,9 +89,10 @@ def up(
             create_cluster()
             typer.secho(f"Cluster '{CLUSTER_NAME}' created.", fg=typer.colors.GREEN)
 
-        if not cluster_reachable():
+        typer.echo("Waiting for the Kubernetes API to become ready...")
+        if not wait_for_cluster():
             typer.secho(
-                "Cluster exists, but the Kubernetes API is not reachable.",
+                "Kubernetes API did not become reachable within 120 seconds.",
                 fg=typer.colors.RED,
                 err=True,
             )

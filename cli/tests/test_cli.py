@@ -78,7 +78,7 @@ def test_up_creates_cluster(
     created: list[bool] = []
     monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: False)
     monkeypatch.setattr("kube_launch.main.create_cluster", lambda: created.append(True))
-    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+    monkeypatch.setattr("kube_launch.main.wait_for_cluster", lambda: True)
 
     result = runner.invoke(app, ["up", "--minimal"])
 
@@ -99,7 +99,7 @@ def test_up_keeps_existing_cluster_unchanged(
         "kube_launch.main.create_cluster",
         lambda: pytest.fail("existing cluster must not be recreated"),
     )
-    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+    monkeypatch.setattr("kube_launch.main.wait_for_cluster", lambda: True)
 
     result = runner.invoke(app, ["up", "--minimal"])
 

@@ -7,6 +7,7 @@ from kube_launch.cluster import (
     cluster_reachable,
     create_cluster,
     delete_cluster,
+    wait_for_cluster,
 )
 
 
@@ -48,7 +49,9 @@ def test_cluster_exists_rejects_invalid_output(
         cluster_exists()
 
 
-def test_create_cluster_uses_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_cluster_uses_loopback_api_and_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
 
     def fake_run(
@@ -61,7 +64,17 @@ def test_create_cluster_uses_wait(monkeypatch: pytest.MonkeyPatch) -> None:
 
     create_cluster()
 
-    assert commands == [["k3d", "cluster", "create", "kubelaunch", "--wait"]]
+    assert commands == [
+        [
+            "k3d",
+            "cluster",
+            "create",
+            "kubelaunch",
+            "--api-port",
+            "127.0.0.1:0",
+            "--wait",
+        ]
+    ]
 
 
 def test_delete_cluster_surfaces_k3d_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -91,5 +104,34 @@ def test_cluster_reachable_uses_dedicated_context(
 
     assert cluster_reachable() is True
     assert commands == [
-        ["kubectl", "--context", "k3d-kubelaunch", "get", "--raw=/readyz"]
+        [
+            "kubectl",
+            "--context",
+            "k3d-kubelaunch",
+            "--request-timeout=5s",
+            "get",
+            "--raw=/readyz",
+        ]
     ]
+
+
+def test_wait_for_cluster_retries_until_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts = iter((False, False, True))
+    sleeps: list[float] = []
+    monkeypatch.setattr(
+        "kube_launch.cluster.cluster_reachable",
+        lambda: next(attempts),
+    )
+    monkeypatch.setattr(
+        "kube_launch.cluster.time.sleep",
+        lambda seconds: sleeps.append(seconds),
+    )
+
+    assert wait_for_cluster() is True
+    assert sleeps == [2, 2]
+
+
+def test_wait_for_cluster_stops_at_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("kube_launch.cluster.cluster_reachable", lambda: False)
+
+    assert wait_for_cluster(timeout_seconds=0) is False

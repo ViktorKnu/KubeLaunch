@@ -76,6 +76,9 @@ Kommandoene sjekker først om nødvendige verktøy finnes. `up` oppretter cluste
 bare hvis det mangler, installerer eller oppdaterer Argo CD og legger inn root
 Application. `down` ber om bekreftelse før hele clusteret slettes.
 
+Kubernetes API-et bindes til `127.0.0.1`. CLI-et venter i opptil to minutter på
+at API-et blir klart før bootstrapen fortsetter.
+
 ```console
 kube-launch up --minimal
 kube-launch status

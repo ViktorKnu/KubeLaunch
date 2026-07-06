@@ -26,6 +26,10 @@ kube-launch down
 `status` sjekker både om clusteret finnes og om Kubernetes API-et svarer.
 `down` ber om bekreftelse; bruk `down --yes` i automatiserte kjøringer.
 
+Nye cluster eksponerer Kubernetes API-et på `127.0.0.1` for å unngå lokale
+DNS-problemer med `host.docker.internal`. Etter opprettelse venter CLI-et i
+opptil to minutter og prøver readiness-endepunktet flere ganger.
+
 Når clusteret er klart, installerer `up` Argo CD med Helm og venter til
 installasjonen er klar. Til slutt legges `platform/root-application.yaml` inn i
 clusteret. Root Application peker på `platform/` i dette repoet; alle andre
