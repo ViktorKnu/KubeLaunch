@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-smoke-test
+  labels:
+    app.kubernetes.io/name: keda-smoke-test
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keda-smoke-test
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keda-smoke-test
+        app.kubernetes.io/part-of: kubelaunch
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: application
+          image: registry.k8s.io/hpa-example:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi

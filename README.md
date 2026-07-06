@@ -94,6 +94,7 @@ Kjør `make help` for å se de samme oppgavene via Makefile.
 |   `-- components/        # Argo CD Applications for hver komponent
 |-- apps/
 |   |-- ai-demo/           # Frontend, backend og Kubernetes-oppsett
+|   |-- keda-smoke-test/   # Isolert test av autoskalering
 |   `-- platform-smoke-test/ # Enkel test av GitOps-flyten
 |-- docs/                  # Arkitektur, demo-notater og videre plan
 |-- scripts/               # Små hjelpere for lokal testing
@@ -147,6 +148,31 @@ kubectl --context k3d-kubelaunch --namespace monitoring get secret kubelaunch-gr
 
 `kube-launch status` viser både sync-status og port-forward-kommandoen.
 
+## Test KEDA-skalering
+
+KEDA installeres fra det offisielle Helm-chartet. En egen smoke test bruker
+CPU-scaleren mot Kubernetes sitt `hpa-example`, slik at autoskalering kan testes
+før AI-backenden finnes. KEDA oppretter en HPA som holder mellom én og tre pods.
+
+Start last i én terminal:
+
+```console
+make keda-load
+```
+
+Følg skaleringen i en annen terminal:
+
+```console
+make keda-status
+# eller kontinuerlig:
+kubectl --context k3d-kubelaunch --namespace kubelaunch-system get deployment,hpa --watch
+```
+
+Etter en liten stund skal antall replikaer øke. Stopp lastgeneratoren med
+`Ctrl+C`; workloaden skal gå tilbake til én replika etter stabiliseringsvinduet.
+Denne testen skalerer bare dummy-appen. Ollama skal senere kjøre stabilt med én
+replika.
+
 ## Utvikling
 
 ```console
@@ -156,8 +182,8 @@ make lint
 make validate
 ```
 
-`test` og `lint` kjører kontrollene for CLI-et. `validate` er foreløpig en
-placeholder og tas i bruk når de første plattformfilene kommer.
+`test` og `lint` kjører kontrollene for CLI-et. `validate` sjekker YAML-filene
+og renderer begge Kustomize-appene lokalt.
 
 ## Lisens
 

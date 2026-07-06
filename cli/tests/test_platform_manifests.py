@@ -41,12 +41,59 @@ def test_observability_uses_pinned_prometheus_stack() -> None:
     assert "ServerSideApply=true" in application["spec"]["syncPolicy"]["syncOptions"]
 
 
-def test_kustomization_references_existing_resources() -> None:
-    app_directory = REPOSITORY_ROOT / "apps" / "platform-smoke-test"
-    kustomization = load_yaml("apps/platform-smoke-test/kustomization.yaml")
+def test_keda_uses_pinned_official_chart() -> None:
+    application = load_yaml("platform/components/keda-application.yaml")
+    source = application["spec"]["source"]
 
-    for resource in kustomization["resources"]:
-        assert (app_directory / resource).is_file()
+    assert source["repoURL"] == "https://kedacore.github.io/charts"
+    assert source["chart"] == "keda"
+    assert source["targetRevision"] == "2.20.1"
+    assert application["spec"]["destination"]["namespace"] == "keda"
+    assert application["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "0"
+
+
+def test_keda_smoke_test_waits_for_keda_and_ignores_replicas() -> None:
+    application = load_yaml("platform/components/keda-smoke-test-application.yaml")
+
+    assert application["spec"]["source"]["path"] == "apps/keda-smoke-test"
+    assert application["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
+    assert application["spec"]["ignoreDifferences"][0]["jsonPointers"] == [
+        "/spec/replicas"
+    ]
+    assert (
+        "RespectIgnoreDifferences=true"
+        in application["spec"]["syncPolicy"]["syncOptions"]
+    )
+
+
+def test_keda_scaled_object_targets_cpu_workload() -> None:
+    scaled_object = load_yaml("apps/keda-smoke-test/scaled-object.yaml")
+    deployment = load_yaml("apps/keda-smoke-test/deployment.yaml")
+    trigger = scaled_object["spec"]["triggers"][0]
+
+    assert scaled_object["spec"]["scaleTargetRef"]["name"] == "keda-smoke-test"
+    assert scaled_object["spec"]["minReplicaCount"] == 1
+    assert scaled_object["spec"]["maxReplicaCount"] == 3
+    assert trigger == {
+        "type": "cpu",
+        "metricType": "Utilization",
+        "metadata": {"value": "50"},
+    }
+    assert (
+        deployment["spec"]["template"]["spec"]["containers"][0]["resources"][
+            "requests"
+        ]["cpu"]
+        == "200m"
+    )
+
+
+def test_kustomization_references_existing_resources() -> None:
+    for app_name in ("platform-smoke-test", "keda-smoke-test"):
+        app_directory = REPOSITORY_ROOT / "apps" / app_name
+        kustomization = load_yaml(f"apps/{app_name}/kustomization.yaml")
+
+        for resource in kustomization["resources"]:
+            assert (app_directory / resource).is_file()
 
 
 def test_service_selector_matches_deployment() -> None:

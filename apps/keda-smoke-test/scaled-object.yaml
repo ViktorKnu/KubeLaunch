@@ -1,0 +1,22 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: keda-smoke-test
+  labels:
+    app.kubernetes.io/name: keda-smoke-test
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  scaleTargetRef:
+    name: keda-smoke-test
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 30
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "50"

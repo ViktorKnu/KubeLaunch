@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-smoke-test
+  labels:
+    app.kubernetes.io/name: keda-smoke-test
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  selector:
+    app.kubernetes.io/name: keda-smoke-test
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
