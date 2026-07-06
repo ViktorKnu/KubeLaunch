@@ -13,6 +13,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+backend = [
+    "fastapi>=0.115,<1.0",
+    "httpx>=0.28,<1.0",
+    "prometheus-client>=0.21,<1.0",
+    "uvicorn[standard]>=0.34,<1.0",
+]
 dev = [
     "pytest>=8,<10",
     "PyYAML>=6,<7",
@@ -30,8 +36,8 @@ where = ["cli"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
-pythonpath = ["cli"]
-testpaths = ["cli/tests"]
+pythonpath = ["cli", "apps/ai-demo/backend"]
+testpaths = ["cli/tests", "apps/ai-demo/backend/tests"]
 
 [tool.ruff]
 line-length = 88

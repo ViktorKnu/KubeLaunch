@@ -1,4 +1,6 @@
 # AI-demo
 
-Her skal frontend, FastAPI-backend, Dockerfiles og Kubernetes-oppsettet for
-demoen ligge. Backend og frontend bygges i hver sin milepæl senere i prosjektet.
+AI-demoen består foreløpig av en FastAPI-backend som snakker med Ollama.
+Frontend legges til i neste milepæl.
+
+Backenden og Kubernetes-oppsettet ligger i [`backend/`](backend/README.md).

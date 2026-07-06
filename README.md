@@ -5,8 +5,8 @@ er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
 
 > **Status:** CLI-et kan opprette et lokalt k3d-cluster og installere Argo CD.
-> App-of-apps-flyten, Prometheus og Grafana er koblet opp. De øvrige
-> plattformkomponentene kommer i senere milepæler.
+> App-of-apps, observability, KEDA, Ollama og FastAPI-backenden er koblet opp.
+> Frontend og autoskalering av backenden kommer i senere milepæler.
 
 ## Hvorfor dette prosjektet?
 
@@ -96,7 +96,7 @@ Kjør `make help` for å se de samme oppgavene via Makefile.
 |-- platform/              # Root app og GitOps-oppsett
 |   `-- components/        # Argo CD Applications for hver komponent
 |-- apps/
-|   |-- ai-demo/           # Frontend, backend og Kubernetes-oppsett
+|   |-- ai-demo/           # FastAPI-backend; frontend kommer senere
 |   |-- keda-smoke-test/   # Isolert test av autoskalering
 |   |-- ollama/            # Stabil lokal AI-runtime og modellager
 |   `-- platform-smoke-test/ # Enkel test av GitOps-flyten
@@ -205,6 +205,36 @@ curl.exe http://localhost:11434/api/generate -H "Content-Type: application/json"
 
 Første svar kan ta litt tid på CPU. Hvis `tinyllama` ikke vises i `/api/tags`,
 sjekk PostSync-jobben og Argo CD-syncen før du tester videre.
+
+## Test backenden
+
+FastAPI-backenden validerer prompten, kaller Ollama og returnerer svar, modellnavn
+og responstid. Den eksponerer også Prometheus-metrics for antall prompts og
+responstid.
+
+Bygg imagen og importer den til k3d før Argo CD deployer appen:
+
+```console
+make backend-image
+```
+
+Etter at endringen er committet, pushet og `ai-demo-backend` er `Healthy`, start
+port-forward:
+
+```console
+make backend
+```
+
+Test health, prompt og metrics fra en annen terminal:
+
+```console
+curl.exe http://localhost:8000/health
+curl.exe http://localhost:8000/api/prompt -H "Content-Type: application/json" -d '{"prompt":"Hva er GitOps? Svar kort."}'
+curl.exe http://localhost:8000/metrics
+```
+
+Prometheus finner `/metrics` gjennom en ServiceMonitor. Backenden kjører med én
+replika i denne milepælen; KEDA kobles på senere.
 
 ## Utvikling
 

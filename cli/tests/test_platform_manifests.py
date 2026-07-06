@@ -124,6 +124,41 @@ def test_ollama_model_pull_is_post_sync_hook() -> None:
     assert container["env"] == [{"name": "OLLAMA_HOST", "value": "http://ollama:11434"}]
 
 
+def test_ai_backend_application_uses_gitops_manifests() -> None:
+    application = load_yaml("platform/components/ai-demo-backend-application.yaml")
+
+    assert application["spec"]["source"]["path"] == "apps/ai-demo/backend/k8s"
+    assert application["spec"]["destination"]["namespace"] == "ai-demo"
+    assert application["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "2"
+
+
+def test_ai_backend_connects_to_ollama_without_keda() -> None:
+    directory = REPOSITORY_ROOT / "apps" / "ai-demo" / "backend" / "k8s"
+    deployment = load_yaml("apps/ai-demo/backend/k8s/deployment.yaml")
+    kustomization = load_yaml("apps/ai-demo/backend/k8s/kustomization.yaml")
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    environment = {item["name"]: item["value"] for item in container["env"]}
+
+    assert deployment["spec"]["replicas"] == 1
+    assert container["image"] == "kubelaunch-backend:dev"
+    assert environment["OLLAMA_BASE_URL"] == (
+        "http://ollama.ollama.svc.cluster.local:11434"
+    )
+    assert "scaled-object.yaml" not in kustomization["resources"]
+    for resource in kustomization["resources"]:
+        assert (directory / resource).is_file()
+
+
+def test_ai_backend_metrics_are_selected_by_prometheus() -> None:
+    service = load_yaml("apps/ai-demo/backend/k8s/service.yaml")
+    monitor = load_yaml("apps/ai-demo/backend/k8s/service-monitor.yaml")
+    selector = monitor["spec"]["selector"]["matchLabels"]
+
+    assert monitor["metadata"]["labels"]["release"] == "observability"
+    assert selector.items() <= service["metadata"]["labels"].items()
+    assert monitor["spec"]["endpoints"][0]["path"] == "/metrics"
+
+
 def test_kustomization_references_existing_resources() -> None:
     for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
         app_directory = REPOSITORY_ROOT / "apps" / app_name

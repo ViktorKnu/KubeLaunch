@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-demo-backend
+  labels:
+    app.kubernetes.io/name: ai-demo-backend
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  selector:
+    app.kubernetes.io/name: ai-demo-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
