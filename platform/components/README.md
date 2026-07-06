@@ -1,5 +1,6 @@
 # Plattformkomponenter
 
 Hver YAML-fil her beskriver én child Application som Argo CD skal håndtere.
-Første komponent er en liten smoke test; Prometheus og Grafana, KEDA, Ollama og
+Smoke-testen verifiserer GitOps-flyten. `observability-application.yaml`
+installerer Prometheus og Grafana fra et pinna Helm-chart. KEDA, Ollama og
 AI-demoen legges til i egne milepæler.

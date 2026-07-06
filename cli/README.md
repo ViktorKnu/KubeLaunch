@@ -31,6 +31,9 @@ installasjonen er klar. Til slutt legges `platform/root-application.yaml` inn i
 clusteret. Root Application peker på `platform/` i dette repoet; alle andre
 komponenter skal etter hvert synkroniseres av Argo CD.
 
+Når observability-applikasjonen finnes, viser `status` Argo CD-sync og health
+for den, sammen med kommandoen som åpner Grafana på `http://localhost:3000`.
+
 Tester og lint kjøres slik:
 
 ```console

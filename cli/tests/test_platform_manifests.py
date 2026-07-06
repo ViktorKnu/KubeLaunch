@@ -26,6 +26,21 @@ def test_smoke_test_application_uses_kustomize_directory() -> None:
     assert "CreateNamespace=true" in application["spec"]["syncPolicy"]["syncOptions"]
 
 
+def test_observability_uses_pinned_prometheus_stack() -> None:
+    application = load_yaml("platform/components/observability-application.yaml")
+    source = application["spec"]["source"]
+    values = source["helm"]["valuesObject"]
+
+    assert source["chart"] == "kube-prometheus-stack"
+    assert source["targetRevision"] == "86.0.0"
+    assert application["spec"]["destination"]["namespace"] == "monitoring"
+    assert values["alertmanager"]["enabled"] is False
+    assert values["grafana"]["enabled"] is True
+    assert values["grafana"]["fullnameOverride"] == "kubelaunch-grafana"
+    assert values["prometheus"]["prometheusSpec"]["retention"] == "6h"
+    assert "ServerSideApply=true" in application["spec"]["syncPolicy"]["syncOptions"]
+
+
 def test_kustomization_references_existing_resources() -> None:
     app_directory = REPOSITORY_ROOT / "apps" / "platform-smoke-test"
     kustomization = load_yaml("apps/platform-smoke-test/kustomization.yaml")

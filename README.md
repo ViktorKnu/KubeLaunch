@@ -5,7 +5,7 @@ er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
 
 > **Status:** CLI-et kan opprette et lokalt k3d-cluster og installere Argo CD.
-> App-of-apps-flyten er koblet opp med en liten smoke test. De faktiske
+> App-of-apps-flyten, Prometheus og Grafana er koblet opp. De øvrige
 > plattformkomponentene kommer i senere milepæler.
 
 ## Hvorfor dette prosjektet?
@@ -122,6 +122,30 @@ slik:
 ```console
 kubectl --context k3d-kubelaunch -n kubelaunch-system get deployment,service
 ```
+
+## Prometheus og Grafana
+
+Observability installeres av Argo CD med `kube-prometheus-stack`. Oppsettet er
+tilpasset et lite k3d-cluster: Alertmanager er slått av, data lagres midlertidig
+og Prometheus beholder metrics i seks timer. De innebygde Kubernetes-dashboardene
+er tilgjengelige med en gang Grafana er klar.
+
+Start lokal tilgang til Grafana:
+
+```console
+make grafana
+# eller:
+kubectl --context k3d-kubelaunch --namespace monitoring port-forward service/kubelaunch-grafana 3000:80
+```
+
+Åpne `http://localhost:3000` og logg inn som `admin`. Det genererte passordet
+kan hentes uten ekstra verktøy:
+
+```console
+kubectl --context k3d-kubelaunch --namespace monitoring get secret kubelaunch-grafana --output go-template='{{index .data "admin-password" | base64decode}}{{"\n"}}'
+```
+
+`kube-launch status` viser både sync-status og port-forward-kommandoen.
 
 ## Utvikling
 

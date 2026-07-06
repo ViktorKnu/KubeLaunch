@@ -4,6 +4,7 @@ import typer
 
 from kube_launch.argocd import (
     ArgoCDCommandError,
+    application_status,
     apply_root_application,
     argocd_status,
     install_argocd,
@@ -159,11 +160,36 @@ def status() -> None:
 
         root_exists = root_application_exists()
         typer.echo(f"Root Application: {'applied' if root_exists else 'missing'}")
+
+        observability = application_status("observability")
+        if observability.exists:
+            typer.echo(
+                "Observability: "
+                f"{observability.sync_status} / {observability.health_status}"
+            )
+            typer.echo(
+                "Grafana: kubectl --context k3d-kubelaunch --namespace monitoring "
+                "port-forward service/kubelaunch-grafana 3000:80"
+            )
+            typer.echo("Grafana URL: http://localhost:3000")
+        else:
+            typer.echo("Observability: Application missing")
     except ArgoCDCommandError as error:
         _print_argocd_error(error)
         raise typer.Exit(code=1) from error
 
-    if not tools_ready or not reachable or not argo.ready or not root_exists:
+    observability_ready = (
+        observability.exists
+        and observability.sync_status == "Synced"
+        and observability.health_status == "Healthy"
+    )
+    if (
+        not tools_ready
+        or not reachable
+        or not argo.ready
+        or not root_exists
+        or not observability_ready
+    ):
         raise typer.Exit(code=1)
 
 

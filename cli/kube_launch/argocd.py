@@ -38,6 +38,15 @@ class ArgoCDStatus:
     desired_replicas: int = 0
 
 
+@dataclass(frozen=True)
+class ApplicationStatus:
+    """Sync and health information for an Argo CD Application."""
+
+    exists: bool
+    sync_status: str = "Unknown"
+    health_status: str = "Unknown"
+
+
 def _run(command: list[str]) -> CommandResult:
     try:
         completed = subprocess.run(
@@ -180,3 +189,44 @@ def root_application_exists() -> bool:
     if "notfound" in result.stderr.replace(" ", "").lower():
         return False
     _raise_command_error("read the root Argo CD Application", result)
+
+
+def application_status(name: str) -> ApplicationStatus:
+    """Return Argo CD sync and health status for an Application."""
+    result = _run(
+        [
+            "kubectl",
+            "--context",
+            KUBE_CONTEXT,
+            "--namespace",
+            ARGOCD_NAMESPACE,
+            "get",
+            "application",
+            name,
+            "--output",
+            "json",
+        ]
+    )
+    if result.returncode != 0:
+        if "notfound" in result.stderr.replace(" ", "").lower():
+            return ApplicationStatus(exists=False)
+        _raise_command_error(f"read Argo CD Application '{name}'", result)
+
+    try:
+        application = json.loads(result.stdout)
+        sync_status = (
+            application.get("status", {}).get("sync", {}).get("status", "Unknown")
+        )
+        health_status = (
+            application.get("status", {}).get("health", {}).get("status", "Unknown")
+        )
+    except (AttributeError, json.JSONDecodeError) as error:
+        raise ArgoCDCommandError(
+            f"kubectl returned an invalid status for Application '{name}'"
+        ) from error
+
+    return ApplicationStatus(
+        exists=True,
+        sync_status=str(sync_status),
+        health_status=str(health_status),
+    )

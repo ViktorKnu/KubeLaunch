@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up status down test lint validate
+.PHONY: help setup up status down grafana test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -9,6 +9,7 @@ help: ## Show available development tasks
 	@echo "  make up         Validate the host for the minimal platform"
 	@echo "  make status     Show local platform status"
 	@echo "  make down       Run the platform cleanup command"
+	@echo "  make grafana    Forward Grafana to http://localhost:3000"
 	@echo "  make test       Run available tests"
 	@echo "  make lint       Run available linters"
 	@echo "  make validate   Validate platform definitions"
@@ -24,6 +25,9 @@ status:
 
 down:
 	kube-launch down
+
+grafana:
+	kubectl --context k3d-kubelaunch --namespace monitoring port-forward service/kubelaunch-grafana 3000:80
 
 test:
 	python -m pytest

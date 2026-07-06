@@ -5,6 +5,7 @@ import pytest
 import yaml
 from kube_launch.argocd import (
     ARGOCD_CHART_VERSION,
+    application_status,
     apply_root_application,
     argocd_status,
     install_argocd,
@@ -113,6 +114,39 @@ def test_root_application_exists(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert root_application_exists() is True
+
+
+def test_application_status_reads_sync_and_health(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = '{"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}'
+    monkeypatch.setattr(
+        "kube_launch.argocd.subprocess.run",
+        lambda *_args, **_kwargs: completed(stdout=payload),
+    )
+
+    status = application_status("observability")
+
+    assert status.exists is True
+    assert status.sync_status == "Synced"
+    assert status.health_status == "Healthy"
+
+
+def test_application_status_handles_missing_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    not_found = 'Error from server (NotFound): Application "observability" not found'
+    monkeypatch.setattr(
+        "kube_launch.argocd.subprocess.run",
+        lambda *_args, **_kwargs: completed(
+            stderr=not_found,
+            returncode=1,
+        ),
+    )
+
+    status = application_status("observability")
+
+    assert status.exists is False
 
 
 def test_root_application_points_to_platform_directory() -> None:

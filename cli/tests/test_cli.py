@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from kube_launch.argocd import ArgoCDStatus
+from kube_launch.argocd import ApplicationStatus, ArgoCDStatus
 from kube_launch.main import app
 from typer.testing import CliRunner
 
@@ -23,6 +23,10 @@ def argocd_ready(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: ArgoCDStatus(True, True, 1, 1),
     )
     monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.application_status",
+        lambda _name: ApplicationStatus(True, "Synced", "Healthy"),
+    )
 
 
 @pytest.fixture
@@ -119,6 +123,9 @@ def test_status_reports_reachable_cluster(
     assert "Kubernetes API: reachable" in result.stdout
     assert "Argo CD: ready (1/1)" in result.stdout
     assert "Root Application: applied" in result.stdout
+    assert "Observability: Synced / Healthy" in result.stdout
+    assert "service/kubelaunch-grafana 3000:80" in result.stdout
+    assert "Grafana URL: http://localhost:3000" in result.stdout
 
 
 def test_status_reports_missing_cluster(
@@ -148,6 +155,29 @@ def test_status_reports_missing_argocd(
 
     assert result.exit_code == 1
     assert "Argo CD: not installed" in result.stdout
+
+
+def test_status_reports_observability_still_syncing(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.argocd_status",
+        lambda: ArgoCDStatus(True, True, 1, 1),
+    )
+    monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.application_status",
+        lambda _name: ApplicationStatus(True, "OutOfSync", "Progressing"),
+    )
+
+    result = runner.invoke(app, ["status"])
+
+    assert result.exit_code == 1
+    assert "Observability: OutOfSync / Progressing" in result.stdout
+    assert "Grafana URL: http://localhost:3000" in result.stdout
 
 
 def test_down_is_idempotent_when_cluster_is_missing(
