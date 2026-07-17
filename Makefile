@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up status down grafana keda-load keda-status ollama backend-image backend test lint validate
+.PHONY: help setup up status down grafana keda-load keda-status ollama backend-image backend frontend-image frontend test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -15,6 +15,8 @@ help: ## Show available development tasks
 	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make backend-image Build and import the backend image into k3d"
 	@echo "  make backend    Forward the backend to http://localhost:8000"
+	@echo "  make frontend-image Build and import the frontend image into k3d"
+	@echo "  make frontend   Forward the frontend to http://localhost:8080"
 	@echo "  make test       Run available tests"
 	@echo "  make lint       Run available linters"
 	@echo "  make validate   Validate platform definitions"
@@ -50,6 +52,13 @@ backend-image:
 backend:
 	kubectl --context k3d-kubelaunch --namespace ai-demo port-forward service/ai-demo-backend 8000:8000
 
+frontend-image:
+	docker build --tag kubelaunch-frontend:dev apps/ai-demo/frontend
+	k3d image import kubelaunch-frontend:dev --cluster kubelaunch
+
+frontend:
+	kubectl --context k3d-kubelaunch --namespace ai-demo port-forward service/ai-demo-frontend 8080:8080
+
 test:
 	python -m pytest
 
@@ -62,3 +71,4 @@ validate:
 	kubectl kustomize apps/keda-smoke-test
 	kubectl kustomize apps/ollama
 	kubectl kustomize apps/ai-demo/backend/k8s
+	kubectl kustomize apps/ai-demo/frontend/k8s

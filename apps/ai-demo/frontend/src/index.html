@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="no">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="En lokal AI-demo bygget på Kubernetes, GitOps og Ollama.">
+    <title>KubeLaunch AI</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div class="brand" aria-label="KubeLaunch">
+          <span class="brand-mark" aria-hidden="true">K</span>
+          <span>KubeLaunch</span>
+        </div>
+        <p class="eyebrow">LOKAL AI · GITOPS-NATIV</p>
+        <h1>Spør modellen.<br><span>Se plattformen jobbe.</span></h1>
+        <p class="intro">
+          En liten AI-tjeneste som kjører lokalt på Kubernetes, levert av Argo CD
+          og observert med Prometheus.
+        </p>
+      </header>
+
+      <section class="workspace" aria-labelledby="prompt-heading">
+        <div class="workspace-header">
+          <div>
+            <p class="section-label">PROMPT</p>
+            <h2 id="prompt-heading">Hva vil du vite?</h2>
+          </div>
+          <span class="status"><i aria-hidden="true"></i> tinyllama</span>
+        </div>
+
+        <form id="prompt-form">
+          <label class="sr-only" for="prompt">Skriv en prompt</label>
+          <textarea
+            id="prompt"
+            name="prompt"
+            maxlength="4000"
+            rows="5"
+            placeholder="For eksempel: Forklar GitOps med tre korte setninger …"
+            required
+          ></textarea>
+          <div class="form-footer">
+            <span id="character-count">0 / 4000</span>
+            <button id="submit-button" type="submit">
+              <span class="button-label">Send prompt</span>
+              <span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </form>
+
+        <div id="result" class="result" aria-live="polite" hidden>
+          <div class="result-header">
+            <p class="section-label">SVAR</p>
+            <span id="response-meta"></span>
+          </div>
+          <p id="answer"></p>
+        </div>
+
+        <div id="error" class="error" role="alert" hidden></div>
+      </section>
+
+      <footer>
+        <span>K3D</span><i></i><span>ARGO CD</span><i></i><span>OLLAMA</span><i></i><span>PROMETHEUS</span>
+      </footer>
+    </main>
+  </body>
+</html>
+

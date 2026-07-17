@@ -17,7 +17,7 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 6. Installere KEDA og teste enkel skalering
 7. Kjøre Ollama som en stabil workload
 8. Lage FastAPI-backend for AI-demoen
-9. Lage frontend for AI-demoen
+9. Lage frontend for AI-demoen (fullført)
 10. Skalere backend med KEDA
 11. Gjøre CLI-et ferdig og mer oversiktlig
 12. Pusse opp dokumentasjon, demo og CI

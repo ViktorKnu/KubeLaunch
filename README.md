@@ -5,8 +5,8 @@ er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
 
 > **Status:** CLI-et kan opprette et lokalt k3d-cluster og installere Argo CD.
-> App-of-apps, observability, KEDA, Ollama og FastAPI-backenden er koblet opp.
-> Frontend og autoskalering av backenden kommer i senere milepæler.
+> App-of-apps, observability, KEDA, Ollama, FastAPI-backenden og frontenden er
+> koblet opp. Autoskalering av backenden kommer i neste milepæl.
 
 ## Hvorfor dette prosjektet?
 
@@ -96,7 +96,7 @@ Kjør `make help` for å se de samme oppgavene via Makefile.
 |-- platform/              # Root app og GitOps-oppsett
 |   `-- components/        # Argo CD Applications for hver komponent
 |-- apps/
-|   |-- ai-demo/           # FastAPI-backend; frontend kommer senere
+|   |-- ai-demo/           # Webfrontend og FastAPI-backend
 |   |-- keda-smoke-test/   # Isolert test av autoskalering
 |   |-- ollama/            # Stabil lokal AI-runtime og modellager
 |   `-- platform-smoke-test/ # Enkel test av GitOps-flyten
@@ -235,6 +235,27 @@ curl.exe http://localhost:8000/metrics
 
 Prometheus finner `/metrics` gjennom en ServiceMonitor. Backenden kjører med én
 replika i denne milepælen; KEDA kobles på senere.
+
+## Test frontenden
+
+Frontenden er statisk HTML, CSS og JavaScript servert av nginx. Nginx sender
+`/api/` videre til backenden internt i clusteret, slik at samme oppsett fungerer
+uten CORS-regler i FastAPI.
+
+Bygg imagen og importer den til k3d:
+
+```console
+make frontend-image
+```
+
+Etter at `ai-demo-frontend` er `Healthy`, start port-forward:
+
+```console
+make frontend
+```
+
+Åpne `http://localhost:8080`, skriv en prompt og kontroller at svar, modellnavn
+og responstid vises.
 
 ## Utvikling
 

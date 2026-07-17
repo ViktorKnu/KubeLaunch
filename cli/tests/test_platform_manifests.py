@@ -159,6 +159,30 @@ def test_ai_backend_metrics_are_selected_by_prometheus() -> None:
     assert monitor["spec"]["endpoints"][0]["path"] == "/metrics"
 
 
+def test_ai_frontend_application_uses_gitops_manifests() -> None:
+    application = load_yaml("platform/components/ai-demo-frontend-application.yaml")
+
+    assert application["spec"]["source"]["path"] == "apps/ai-demo/frontend/k8s"
+    assert application["spec"]["destination"]["namespace"] == "ai-demo"
+    assert application["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "3"
+
+
+def test_ai_frontend_service_matches_deployment() -> None:
+    directory = REPOSITORY_ROOT / "apps" / "ai-demo" / "frontend" / "k8s"
+    deployment = load_yaml("apps/ai-demo/frontend/k8s/deployment.yaml")
+    service = load_yaml("apps/ai-demo/frontend/k8s/service.yaml")
+    kustomization = load_yaml("apps/ai-demo/frontend/k8s/kustomization.yaml")
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+
+    assert container["image"] == "kubelaunch-frontend:dev"
+    assert container["ports"][0]["containerPort"] == 8080
+    assert service["spec"]["selector"].items() <= deployment["spec"]["template"][
+        "metadata"
+    ]["labels"].items()
+    for resource in kustomization["resources"]:
+        assert (directory / resource).is_file()
+
+
 def test_kustomization_references_existing_resources() -> None:
     for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
         app_directory = REPOSITORY_ROOT / "apps" / app_name
