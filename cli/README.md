@@ -23,7 +23,8 @@ kube-launch down
 ```
 
 `up --minimal` er idempotent og lar et eksisterende cluster være i fred.
-`status` sjekker både om clusteret finnes og om Kubernetes API-et svarer.
+`status` sjekker om clusteret finnes, om Kubernetes API-et svarer og om alle
+forventede Argo CD-applikasjoner er `Synced` og `Healthy`.
 `down` ber om bekreftelse; bruk `down --yes` i automatiserte kjøringer.
 
 Nye cluster eksponerer Kubernetes API-et på `127.0.0.1` for å unngå lokale
@@ -35,8 +36,10 @@ installasjonen er klar. Til slutt legges `platform/root-application.yaml` inn i
 clusteret. Root Application peker på `platform/` i dette repoet; alle andre
 komponenter skal etter hvert synkroniseres av Argo CD.
 
-Når observability-applikasjonen finnes, viser `status` Argo CD-sync og health
-for den, sammen med kommandoen som åpner Grafana på `http://localhost:3000`.
+`status` viser samlet sync og health for smoke-testene, observability, KEDA,
+Ollama, backend og frontend. Kommandoen viser også port-forward-kommandoer for
+frontenden, Grafana og Ollama. Den returnerer feilkode hvis en obligatorisk
+komponent mangler eller ikke er klar.
 
 Tester og lint kjøres slik:
 

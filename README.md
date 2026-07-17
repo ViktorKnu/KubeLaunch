@@ -150,7 +150,8 @@ kan hentes uten ekstra verktøy:
 kubectl --context k3d-kubelaunch --namespace monitoring get secret kubelaunch-grafana --output go-template='{{index .data "admin-password" | base64decode}}{{"\n"}}'
 ```
 
-`kube-launch status` viser både sync-status og port-forward-kommandoen.
+`kube-launch status` viser sync og health for alle plattformapplikasjonene,
+sammen med port-forward-kommandoer for frontenden, Grafana og Ollama.
 
 ## Test KEDA-skalering
 

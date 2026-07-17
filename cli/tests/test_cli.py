@@ -124,8 +124,15 @@ def test_status_reports_reachable_cluster(
     assert "Argo CD: ready (1/1)" in result.stdout
     assert "Root Application: applied" in result.stdout
     assert "Observability: Synced / Healthy" in result.stdout
+    assert "KEDA: Synced / Healthy" in result.stdout
+    assert "Ollama: Synced / Healthy" in result.stdout
+    assert "AI demo backend: Synced / Healthy" in result.stdout
+    assert "AI demo frontend: Synced / Healthy" in result.stdout
+    assert "service/ai-demo-frontend 8080:8080" in result.stdout
+    assert "Frontend URL: http://localhost:8080" in result.stdout
     assert "service/kubelaunch-grafana 3000:80" in result.stdout
     assert "Grafana URL: http://localhost:3000" in result.stdout
+    assert "service/ollama 11434:11434" in result.stdout
 
 
 def test_status_reports_missing_cluster(
@@ -157,7 +164,7 @@ def test_status_reports_missing_argocd(
     assert "Argo CD: not installed" in result.stdout
 
 
-def test_status_reports_observability_still_syncing(
+def test_status_reports_applications_still_syncing(
     monkeypatch: pytest.MonkeyPatch,
     tools_available: None,
 ) -> None:
@@ -178,6 +185,49 @@ def test_status_reports_observability_still_syncing(
     assert result.exit_code == 1
     assert "Observability: OutOfSync / Progressing" in result.stdout
     assert "Grafana URL: http://localhost:3000" in result.stdout
+
+
+def test_status_reports_missing_application(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.argocd_status",
+        lambda: ArgoCDStatus(True, True, 1, 1),
+    )
+    monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
+    monkeypatch.setattr(
+        "kube_launch.main.application_status",
+        lambda name: (
+            ApplicationStatus(False)
+            if name == "ai-demo-frontend"
+            else ApplicationStatus(True, "Synced", "Healthy")
+        ),
+    )
+
+    result = runner.invoke(app, ["status"])
+
+    assert result.exit_code == 1
+    assert "AI demo frontend: missing" in result.stdout
+
+
+def test_status_stops_when_cluster_is_unreachable(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: False)
+    monkeypatch.setattr(
+        "kube_launch.main.argocd_status",
+        lambda: pytest.fail("Argo CD must not be queried without a reachable API"),
+    )
+
+    result = runner.invoke(app, ["status"])
+
+    assert result.exit_code == 1
+    assert "Kubernetes API: not reachable" in result.stdout
 
 
 def test_down_is_idempotent_when_cluster_is_missing(

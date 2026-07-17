@@ -19,7 +19,7 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 8. Lage FastAPI-backend for AI-demoen
 9. Lage frontend for AI-demoen (fullført)
 10. Skalere backend med KEDA (fullført)
-11. Gjøre CLI-et ferdig og mer oversiktlig
+11. Gjøre CLI-et ferdig og mer oversiktlig (fullført)
 12. Pusse opp dokumentasjon, demo og CI
 
 Etter MVP-en kan prosjektet utvides med blant annet `--full`-modus,

@@ -12,6 +12,7 @@ from kube_launch.argocd import (
 )
 from kube_launch.cluster import (
     CLUSTER_NAME,
+    KUBE_CONTEXT,
     ClusterCommandError,
     cluster_exists,
     cluster_reachable,
@@ -25,6 +26,16 @@ app = typer.Typer(
     name="kube-launch",
     help="Bootstrap and inspect a local GitOps-native Kubernetes platform.",
     no_args_is_help=True,
+)
+
+PLATFORM_APPLICATIONS = (
+    ("platform-smoke-test", "Platform smoke test"),
+    ("observability", "Observability"),
+    ("keda", "KEDA"),
+    ("keda-smoke-test", "KEDA smoke test"),
+    ("ollama", "Ollama"),
+    ("ai-demo-backend", "AI demo backend"),
+    ("ai-demo-frontend", "AI demo frontend"),
 )
 
 
@@ -53,7 +64,55 @@ def _print_cluster_error(error: ClusterCommandError) -> None:
 
 
 def _print_argocd_error(error: ArgoCDCommandError) -> None:
-    typer.secho(f"Argo CD bootstrap failed: {error}", fg=typer.colors.RED, err=True)
+    typer.secho(f"Argo CD operation failed: {error}", fg=typer.colors.RED, err=True)
+
+
+def _print_application_statuses() -> bool:
+    """Print every expected child Application and return overall readiness."""
+    typer.echo("Applications:")
+    all_ready = True
+
+    for name, display_name in PLATFORM_APPLICATIONS:
+        application = application_status(name)
+        if not application.exists:
+            typer.secho(
+                f"  {display_name}: missing",
+                fg=typer.colors.RED,
+            )
+            all_ready = False
+            continue
+
+        ready = (
+            application.sync_status == "Synced"
+            and application.health_status == "Healthy"
+        )
+        typer.secho(
+            f"  {display_name}: "
+            f"{application.sync_status} / {application.health_status}",
+            fg=typer.colors.GREEN if ready else typer.colors.YELLOW,
+        )
+        all_ready = all_ready and ready
+
+    return all_ready
+
+
+def _print_local_access() -> None:
+    """Print commands for services intended for local use."""
+    typer.echo("Local access:")
+    typer.echo(
+        f"  Frontend: kubectl --context {KUBE_CONTEXT} --namespace ai-demo "
+        "port-forward service/ai-demo-frontend 8080:8080"
+    )
+    typer.echo("  Frontend URL: http://localhost:8080")
+    typer.echo(
+        f"  Grafana: kubectl --context {KUBE_CONTEXT} --namespace monitoring "
+        "port-forward service/kubelaunch-grafana 3000:80"
+    )
+    typer.echo("  Grafana URL: http://localhost:3000")
+    typer.echo(
+        f"  Ollama: kubectl --context {KUBE_CONTEXT} --namespace ollama "
+        "port-forward service/ollama 11434:11434"
+    )
 
 
 @app.command()
@@ -140,6 +199,7 @@ def status() -> None:
             typer.secho("Kubernetes API: reachable", fg=typer.colors.GREEN)
         else:
             typer.secho("Kubernetes API: not reachable", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
     except ClusterCommandError as error:
         _print_cluster_error(error)
         raise typer.Exit(code=1) from error
@@ -162,35 +222,17 @@ def status() -> None:
 
         root_exists = root_application_exists()
         typer.echo(f"Root Application: {'applied' if root_exists else 'missing'}")
-
-        observability = application_status("observability")
-        if observability.exists:
-            typer.echo(
-                "Observability: "
-                f"{observability.sync_status} / {observability.health_status}"
-            )
-            typer.echo(
-                "Grafana: kubectl --context k3d-kubelaunch --namespace monitoring "
-                "port-forward service/kubelaunch-grafana 3000:80"
-            )
-            typer.echo("Grafana URL: http://localhost:3000")
-        else:
-            typer.echo("Observability: Application missing")
+        applications_ready = _print_application_statuses()
+        _print_local_access()
     except ArgoCDCommandError as error:
         _print_argocd_error(error)
         raise typer.Exit(code=1) from error
 
-    observability_ready = (
-        observability.exists
-        and observability.sync_status == "Synced"
-        and observability.health_status == "Healthy"
-    )
     if (
         not tools_ready
-        or not reachable
         or not argo.ready
         or not root_exists
-        or not observability_ready
+        or not applications_ready
     ):
         raise typer.Exit(code=1)
 
