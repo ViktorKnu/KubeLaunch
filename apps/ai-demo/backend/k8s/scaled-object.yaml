@@ -1,0 +1,25 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ai-demo-backend
+  labels:
+    app.kubernetes.io/name: ai-demo-backend
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  scaleTargetRef:
+    name: ai-demo-backend
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://observability-kube-prometh-prometheus.monitoring.svc.cluster.local:9090
+        metricName: kubelaunch_prompt_requests_in_progress
+        query: sum(kubelaunch_prompt_requests_in_progress)
+        threshold: "1"
+        ignoreNullValues: "false"

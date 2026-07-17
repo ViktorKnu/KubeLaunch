@@ -6,7 +6,7 @@ sammen, uten at prosjektet blir unødvendig stort.
 
 > **Status:** CLI-et kan opprette et lokalt k3d-cluster og installere Argo CD.
 > App-of-apps, observability, KEDA, Ollama, FastAPI-backenden og frontenden er
-> koblet opp. Autoskalering av backenden kommer i neste milepæl.
+> koblet opp. Backenden autoskaleres med KEDA basert på aktive prompts.
 
 ## Hvorfor dette prosjektet?
 
@@ -233,8 +233,23 @@ curl.exe http://localhost:8000/api/prompt -H "Content-Type: application/json" -d
 curl.exe http://localhost:8000/metrics
 ```
 
-Prometheus finner `/metrics` gjennom en ServiceMonitor. Backenden kjører med én
-replika i denne milepælen; KEDA kobles på senere.
+Prometheus finner `/metrics` gjennom en ServiceMonitor. KEDA leser antall aktive
+prompts fra Prometheus og skalerer backenden mellom én og tre replikaer. Ollama
+forblir én stabil replika.
+
+### Test autoskalering av backenden
+
+Start frontenden med `make frontend`, og send flere prompts samtidig fra ulike
+nettleserfaner. Følg skaleringen i en annen terminal:
+
+```console
+make backend-scale-status
+# eller kontinuerlig:
+kubectl --context k3d-kubelaunch --namespace ai-demo get scaledobject,hpa,deployment --watch
+```
+
+KEDA sikter mot én aktiv prompt per backend-replika og kan skalere opp til tre.
+Etter 60 sekunder uten belastning skaleres backenden gradvis ned til én replika.
 
 ## Test frontenden
 

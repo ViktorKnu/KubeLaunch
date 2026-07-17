@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up status down grafana keda-load keda-status ollama backend-image backend frontend-image frontend test lint validate
+.PHONY: help setup up status down grafana keda-load keda-status backend-scale-status ollama backend-image backend frontend-image frontend test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -12,6 +12,7 @@ help: ## Show available development tasks
 	@echo "  make grafana    Forward Grafana to http://localhost:3000"
 	@echo "  make keda-load  Generate CPU load for the KEDA smoke test"
 	@echo "  make keda-status Show KEDA scaling resources"
+	@echo "  make backend-scale-status Show backend KEDA scaling resources"
 	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make backend-image Build and import the backend image into k3d"
 	@echo "  make backend    Forward the backend to http://localhost:8000"
@@ -41,6 +42,9 @@ keda-load:
 
 keda-status:
 	kubectl --context k3d-kubelaunch --namespace kubelaunch-system get scaledobject,hpa,deployment
+
+backend-scale-status:
+	kubectl --context k3d-kubelaunch --namespace ai-demo get scaledobject,hpa,deployment
 
 ollama:
 	kubectl --context k3d-kubelaunch --namespace ollama port-forward service/ollama 11434:11434

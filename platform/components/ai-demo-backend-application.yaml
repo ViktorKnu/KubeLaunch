@@ -16,12 +16,19 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: ai-demo
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: ai-demo-backend
+      jsonPointers:
+        - /spec/replicas
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 10
       backoff:

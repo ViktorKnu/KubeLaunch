@@ -8,7 +8,13 @@ from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 from pydantic import BaseModel, Field, field_validator
 
 OLLAMA_BASE_URL = os.getenv(
@@ -26,6 +32,10 @@ PROMPT_DURATION = Histogram(
     "kubelaunch_prompt_duration_seconds",
     "Time spent waiting for an Ollama prompt response.",
     buckets=(0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120),
+)
+PROMPT_IN_PROGRESS = Gauge(
+    "kubelaunch_prompt_requests_in_progress",
+    "Number of prompts currently waiting for an Ollama response.",
 )
 for metric_status in ("success", "error"):
     PROMPT_REQUESTS.labels(status=metric_status)
@@ -92,6 +102,7 @@ async def prompt(
     """Send one non-streaming prompt to Ollama and return its answer."""
     started_at = time.perf_counter()
     metric_status = "error"
+    PROMPT_IN_PROGRESS.inc()
     try:
         response = await client.post(
             "/api/generate",
@@ -113,6 +124,7 @@ async def prompt(
         raise HTTPException(status_code=502, detail="Ollama request failed") from error
     finally:
         elapsed_seconds = time.perf_counter() - started_at
+        PROMPT_IN_PROGRESS.dec()
         PROMPT_REQUESTS.labels(status=metric_status).inc()
         PROMPT_DURATION.observe(elapsed_seconds)
 

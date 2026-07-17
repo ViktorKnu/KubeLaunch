@@ -3,6 +3,10 @@
 FastAPI-backenden tar imot en prompt på `POST /api/prompt`, sender den videre
 til `tinyllama` i Ollama og returnerer svaret med målt responstid.
 
+KEDA skalerer backenden mellom én og tre replikaer basert på Prometheus-metrikken
+`kubelaunch_prompt_requests_in_progress`. Hver replika sikter mot maksimalt én
+aktiv prompt om gangen. Ollama skaleres ikke.
+
 Endepunkter:
 
 - `GET /health` – enkel prosessjekk

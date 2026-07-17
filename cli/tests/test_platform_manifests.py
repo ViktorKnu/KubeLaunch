@@ -132,7 +132,7 @@ def test_ai_backend_application_uses_gitops_manifests() -> None:
     assert application["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "2"
 
 
-def test_ai_backend_connects_to_ollama_without_keda() -> None:
+def test_ai_backend_connects_to_ollama_and_includes_keda() -> None:
     directory = REPOSITORY_ROOT / "apps" / "ai-demo" / "backend" / "k8s"
     deployment = load_yaml("apps/ai-demo/backend/k8s/deployment.yaml")
     kustomization = load_yaml("apps/ai-demo/backend/k8s/kustomization.yaml")
@@ -144,7 +144,7 @@ def test_ai_backend_connects_to_ollama_without_keda() -> None:
     assert environment["OLLAMA_BASE_URL"] == (
         "http://ollama.ollama.svc.cluster.local:11434"
     )
-    assert "scaled-object.yaml" not in kustomization["resources"]
+    assert "scaled-object.yaml" in kustomization["resources"]
     for resource in kustomization["resources"]:
         assert (directory / resource).is_file()
 
@@ -157,6 +157,43 @@ def test_ai_backend_metrics_are_selected_by_prometheus() -> None:
     assert monitor["metadata"]["labels"]["release"] == "observability"
     assert selector.items() <= service["metadata"]["labels"].items()
     assert monitor["spec"]["endpoints"][0]["path"] == "/metrics"
+
+
+def test_ai_backend_scales_on_active_prompts() -> None:
+    scaled_object = load_yaml("apps/ai-demo/backend/k8s/scaled-object.yaml")
+    trigger = scaled_object["spec"]["triggers"][0]
+
+    assert scaled_object["spec"]["scaleTargetRef"]["name"] == "ai-demo-backend"
+    assert scaled_object["spec"]["minReplicaCount"] == 1
+    assert scaled_object["spec"]["maxReplicaCount"] == 3
+    assert trigger == {
+        "type": "prometheus",
+        "metadata": {
+            "serverAddress": (
+                "http://observability-kube-prometh-prometheus.monitoring.svc."
+                "cluster.local:9090"
+            ),
+            "metricName": "kubelaunch_prompt_requests_in_progress",
+            "query": "sum(kubelaunch_prompt_requests_in_progress)",
+            "threshold": "1",
+            "ignoreNullValues": "false",
+        },
+    }
+
+
+def test_ai_backend_application_leaves_replicas_to_keda() -> None:
+    application = load_yaml("platform/components/ai-demo-backend-application.yaml")
+
+    assert application["spec"]["ignoreDifferences"][0] == {
+        "group": "apps",
+        "kind": "Deployment",
+        "name": "ai-demo-backend",
+        "jsonPointers": ["/spec/replicas"],
+    }
+    assert (
+        "RespectIgnoreDifferences=true"
+        in application["spec"]["syncPolicy"]["syncOptions"]
+    )
 
 
 def test_ai_frontend_application_uses_gitops_manifests() -> None:

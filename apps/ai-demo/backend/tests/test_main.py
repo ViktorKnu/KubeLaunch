@@ -87,3 +87,4 @@ def test_metrics_expose_prompt_counter() -> None:
     assert response.status_code == 200
     assert "kubelaunch_prompt_requests_total" in response.text
     assert "kubelaunch_prompt_duration_seconds" in response.text
+    assert "kubelaunch_prompt_requests_in_progress" in response.text
