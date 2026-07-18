@@ -1,5 +1,7 @@
 # KubeLaunch
 
+[![CI](https://github.com/ViktorKnu/KubeLaunch/actions/workflows/ci.yml/badge.svg)](https://github.com/ViktorKnu/KubeLaunch/actions/workflows/ci.yml)
+
 KubeLaunch setter opp en lokal Kubernetes-plattform for en liten AI-demo. Målet
 er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
@@ -284,6 +286,13 @@ make validate
 
 `test` og `lint` kjører kontrollene for CLI-et. `validate` sjekker YAML-filene
 og renderer Kustomize-appene lokalt.
+
+## Kontinuerlig integrasjon
+
+GitHub Actions kjører automatisk ved push til `main` og for pull requests. CI
+tester prosjektet med Python 3.11 og 3.13, kjører Ruff, validerer alle
+Kubernetes-manifester, renderer Kustomize-applikasjonene og bygger backend- og
+frontend-imagene. Workflowen har bare lesetilgang til repository-innholdet.
 
 ## Lisens
 

@@ -1,8 +1,8 @@
 # Dokumentasjon
 
-Her kommer det etter hvert mer detaljer om arkitektur, demo-oppsett og planen
-for skjermbilder eller GIF. Den overordnede arkitekturen står foreløpig i
-[hoved-README-en](../README.md#arkitektur).
+Den overordnede arkitekturen, demo-oppsettet og kommandoene for lokal kjøring
+står i [hoved-README-en](../README.md). Plattformen valideres automatisk av
+GitHub Actions og kan demonstreres lokalt gjennom frontenden.
 
 ## Videre plan
 
@@ -20,7 +20,7 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 9. Lage frontend for AI-demoen (fullført)
 10. Skalere backend med KEDA (fullført)
 11. Gjøre CLI-et ferdig og mer oversiktlig (fullført)
-12. Pusse opp dokumentasjon, demo og CI
+12. Pusse opp dokumentasjon, demo og CI (fullført)
 
 Etter MVP-en kan prosjektet utvides med blant annet `--full`-modus,
 cert-manager, External Secrets, en `AIWorkload`-operator, vLLM, canary-utrulling
