@@ -78,6 +78,7 @@ jobs:
           kubectl kustomize apps/ollama
           kubectl kustomize apps/ai-demo/backend/k8s
           kubectl kustomize apps/ai-demo/frontend/k8s
+          kubectl kustomize apps/cert-manager-smoke-test
 
       - name: Build backend image
         run: docker build --tag kubelaunch-backend:ci apps/ai-demo/backend

@@ -5,7 +5,11 @@ from pathlib import Path
 import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_ROOTS = (REPOSITORY_ROOT / "platform", REPOSITORY_ROOT / "apps")
+MANIFEST_ROOTS = (
+    REPOSITORY_ROOT / "platform",
+    REPOSITORY_ROOT / "profiles",
+    REPOSITORY_ROOT / "apps",
+)
 
 
 def manifest_files() -> list[Path]:

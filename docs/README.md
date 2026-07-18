@@ -22,6 +22,6 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 11. Gjøre CLI-et ferdig og mer oversiktlig (fullført)
 12. Pusse opp dokumentasjon, demo og CI (fullført)
 
-Etter MVP-en kan prosjektet utvides med blant annet `--full`-modus,
-cert-manager, External Secrets, en `AIWorkload`-operator, vLLM, canary-utrulling
+Etter MVP-en er `--full`-modus og cert-manager lagt til. Prosjektet kan videre
+utvides med External Secrets, en `AIWorkload`-operator, vLLM, canary-utrulling
 og guider for kjøring i skyen.

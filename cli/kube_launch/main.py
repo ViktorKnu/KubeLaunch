@@ -9,6 +9,7 @@ from kube_launch.argocd import (
     argocd_status,
     install_argocd,
     root_application_exists,
+    root_application_profile,
 )
 from kube_launch.cluster import (
     CLUSTER_NAME,
@@ -36,6 +37,10 @@ PLATFORM_APPLICATIONS = (
     ("ollama", "Ollama"),
     ("ai-demo-backend", "AI demo backend"),
     ("ai-demo-frontend", "AI demo frontend"),
+)
+FULL_PLATFORM_APPLICATIONS = (
+    ("cert-manager", "cert-manager"),
+    ("cert-manager-smoke-test", "Certificate smoke test"),
 )
 
 
@@ -67,12 +72,14 @@ def _print_argocd_error(error: ArgoCDCommandError) -> None:
     typer.secho(f"Argo CD operation failed: {error}", fg=typer.colors.RED, err=True)
 
 
-def _print_application_statuses() -> bool:
+def _print_application_statuses(
+    applications: tuple[tuple[str, str], ...] = PLATFORM_APPLICATIONS,
+) -> bool:
     """Print every expected child Application and return overall readiness."""
     typer.echo("Applications:")
     all_ready = True
 
-    for name, display_name in PLATFORM_APPLICATIONS:
+    for name, display_name in applications:
         application = application_status(name)
         if not application.exists:
             typer.secho(
@@ -122,17 +129,23 @@ def up(
         "--minimal",
         help="Use the local MVP platform profile.",
     ),
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help="Use the extended platform profile with cert-manager.",
+    ),
 ) -> None:
     """Create the local k3d cluster if it does not already exist."""
-    typer.secho("KubeLaunch minimal platform", bold=True)
-
-    if not minimal:
+    if minimal == full:
         typer.secho(
-            "The only available profile is --minimal. Run: kube-launch up --minimal",
+            "Choose exactly one profile: --minimal or --full.",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=2)
+
+    profile = "full" if full else "minimal"
+    typer.secho(f"KubeLaunch {profile} platform", bold=True)
 
     if not _check_prerequisites():
         typer.echo("Install the missing tools and run this command again.", err=True)
@@ -166,8 +179,11 @@ def up(
         typer.echo("Installing or updating Argo CD...")
         install_argocd()
         typer.secho("Argo CD is ready.", fg=typer.colors.GREEN)
-        apply_root_application()
-        typer.secho("Root Argo CD Application applied.", fg=typer.colors.GREEN)
+        apply_root_application(profile=profile)
+        typer.secho(
+            f"Root Argo CD Application applied ({profile}).",
+            fg=typer.colors.GREEN,
+        )
     except ArgoCDCommandError as error:
         _print_argocd_error(error)
         raise typer.Exit(code=1) from error
@@ -222,7 +238,12 @@ def status() -> None:
 
         root_exists = root_application_exists()
         typer.echo(f"Root Application: {'applied' if root_exists else 'missing'}")
-        applications_ready = _print_application_statuses()
+        profile = root_application_profile() if root_exists else "unknown"
+        typer.echo(f"Platform profile: {profile}")
+        expected_applications = PLATFORM_APPLICATIONS
+        if profile == "full":
+            expected_applications += FULL_PLATFORM_APPLICATIONS
+        applications_ready = _print_application_statuses(expected_applications)
         _print_local_access()
     except ArgoCDCommandError as error:
         _print_argocd_error(error)

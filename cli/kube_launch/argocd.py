@@ -13,6 +13,10 @@ ARGOCD_CHART = "argo-cd"
 ARGOCD_CHART_REPOSITORY = "https://argoproj.github.io/argo-helm"
 ARGOCD_CHART_VERSION = "9.5.17"
 ROOT_APPLICATION_NAME = "kubelaunch"
+ROOT_APPLICATION_PATHS = {
+    "minimal": Path("platform") / "root-application.yaml",
+    "full": Path("profiles") / "full" / "root-application.yaml",
+}
 
 
 class ArgoCDCommandError(RuntimeError):
@@ -97,25 +101,33 @@ def install_argocd() -> None:
         _raise_command_error("install Argo CD", result)
 
 
-def find_root_application() -> Path:
+def find_root_application(profile: str = "minimal") -> Path:
     """Find the root Application manifest in a source or editable install."""
+    try:
+        relative_path = ROOT_APPLICATION_PATHS[profile]
+    except KeyError as error:
+        raise ArgoCDCommandError(f"Unknown platform profile: {profile}") from error
+
     candidates = (
-        Path.cwd() / "platform" / "root-application.yaml",
-        Path(__file__).resolve().parents[2] / "platform" / "root-application.yaml",
+        Path.cwd() / relative_path,
+        Path(__file__).resolve().parents[2] / relative_path,
     )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
 
     raise ArgoCDCommandError(
-        "Could not find platform/root-application.yaml. "
+        f"Could not find {relative_path.as_posix()}. "
         "Run kube-launch from the repository root."
     )
 
 
-def apply_root_application(manifest: Path | None = None) -> None:
+def apply_root_application(
+    manifest: Path | None = None,
+    profile: str = "minimal",
+) -> None:
     """Apply the single root Application after the Argo CD CRD is ready."""
-    manifest = manifest or find_root_application()
+    manifest = manifest or find_root_application(profile)
     result = _run(
         [
             "kubectl",
@@ -189,6 +201,38 @@ def root_application_exists() -> bool:
     if "notfound" in result.stderr.replace(" ", "").lower():
         return False
     _raise_command_error("read the root Argo CD Application", result)
+
+
+def root_application_profile() -> str:
+    """Return the profile annotation from the root Application."""
+    result = _run(
+        [
+            "kubectl",
+            "--context",
+            KUBE_CONTEXT,
+            "--namespace",
+            ARGOCD_NAMESPACE,
+            "get",
+            "application",
+            ROOT_APPLICATION_NAME,
+            "--output",
+            "json",
+        ]
+    )
+    if result.returncode != 0:
+        _raise_command_error("read the root Argo CD profile", result)
+
+    try:
+        application = json.loads(result.stdout)
+        profile = application.get("metadata", {}).get("annotations", {}).get(
+            "kubelaunch.dev/profile", "minimal"
+        )
+    except (AttributeError, json.JSONDecodeError) as error:
+        raise ArgoCDCommandError(
+            "kubectl returned an invalid root Application profile"
+        ) from error
+
+    return str(profile)
 
 
 def application_status(name: str) -> ApplicationStatus:

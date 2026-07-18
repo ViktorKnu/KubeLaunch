@@ -1,18 +1,20 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up status down grafana keda-load keda-status backend-scale-status ollama backend-image backend frontend-image frontend test lint validate
+.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status ollama backend-image backend frontend-image frontend test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
 	@echo ""
 	@echo "  make setup      Install the CLI and development dependencies"
 	@echo "  make up         Validate the host for the minimal platform"
+	@echo "  make full       Bootstrap the extended platform with cert-manager"
 	@echo "  make status     Show local platform status"
 	@echo "  make down       Run the platform cleanup command"
 	@echo "  make grafana    Forward Grafana to http://localhost:3000"
 	@echo "  make keda-load  Generate CPU load for the KEDA smoke test"
 	@echo "  make keda-status Show KEDA scaling resources"
 	@echo "  make backend-scale-status Show backend KEDA scaling resources"
+	@echo "  make cert-status Show cert-manager certificate resources"
 	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make backend-image Build and import the backend image into k3d"
 	@echo "  make backend    Forward the backend to http://localhost:8000"
@@ -27,6 +29,9 @@ setup:
 
 up:
 	kube-launch up --minimal
+
+full:
+	kube-launch up --full
 
 status:
 	kube-launch status
@@ -45,6 +50,9 @@ keda-status:
 
 backend-scale-status:
 	kubectl --context k3d-kubelaunch --namespace ai-demo get scaledobject,hpa,deployment
+
+cert-status:
+	kubectl --context k3d-kubelaunch --namespace kubelaunch-system get certificate,secret
 
 ollama:
 	kubectl --context k3d-kubelaunch --namespace ollama port-forward service/ollama 11434:11434
@@ -76,3 +84,4 @@ validate:
 	kubectl kustomize apps/ollama
 	kubectl kustomize apps/ai-demo/backend/k8s
 	kubectl kustomize apps/ai-demo/frontend/k8s
+	kubectl kustomize apps/cert-manager-smoke-test

@@ -1,0 +1,9 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: kubelaunch-selfsigned
+  labels:
+    app.kubernetes.io/name: cert-manager-smoke-test
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  selfSigned: {}

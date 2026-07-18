@@ -18,11 +18,16 @@ Kommandoene sjekker at nødvendige verktøy finnes i `PATH`. Clusteret heter
 
 ```console
 kube-launch up --minimal
+kube-launch up --full
 kube-launch status
 kube-launch down
 ```
 
-`up --minimal` er idempotent og lar et eksisterende cluster være i fred.
+`up --minimal` og `up --full` er idempotente og lar et eksisterende cluster være
+i fred. Minimalprofilen installerer MVP-plattformen. Fullprofilen bruker de samme
+komponentene og legger i tillegg til cert-manager med en selvsignert
+sertifikattest. Profilen kan byttes ved å kjøre den andre `up`-kommandoen;
+Argo CD synkroniserer og rydder komponentforskjellene.
 `status` sjekker om clusteret finnes, om Kubernetes API-et svarer og om alle
 forventede Argo CD-applikasjoner er `Synced` og `Healthy`.
 `down` ber om bekreftelse; bruk `down --yes` i automatiserte kjøringer.
@@ -39,7 +44,8 @@ komponenter skal etter hvert synkroniseres av Argo CD.
 `status` viser samlet sync og health for smoke-testene, observability, KEDA,
 Ollama, backend og frontend. Kommandoen viser også port-forward-kommandoer for
 frontenden, Grafana og Ollama. Den returnerer feilkode hvis en obligatorisk
-komponent mangler eller ikke er klar.
+komponent mangler eller ikke er klar. For fullprofilen vises også cert-manager
+og sertifikattesten automatisk.
 
 Tester og lint kjøres slik:
 

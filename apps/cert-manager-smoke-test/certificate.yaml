@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kubelaunch-selfsigned
+  labels:
+    app.kubernetes.io/name: cert-manager-smoke-test
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  secretName: kubelaunch-selfsigned-tls
+  duration: 24h
+  renewBefore: 8h
+  commonName: kubelaunch.local
+  dnsNames:
+    - kubelaunch.local
+  issuerRef:
+    name: kubelaunch-selfsigned
+    kind: ClusterIssuer

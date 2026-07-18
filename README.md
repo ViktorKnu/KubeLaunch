@@ -37,7 +37,7 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 
 ## Dette venter til senere
 
-- cert-manager og automatisk TLS
+- automatisk TLS for frontenden med en offentlig issuer
 - External Secrets og Vault-integrasjon
 - `AIWorkload` CRD og operator
 - vLLM som alternativ runtime
@@ -81,8 +81,13 @@ Application. `down` ber om bekreftelse før hele clusteret slettes.
 Kubernetes API-et bindes til `127.0.0.1`. CLI-et venter i opptil to minutter på
 at API-et blir klart før bootstrapen fortsetter.
 
+`--minimal` kjører MVP-plattformen. `--full` bruker den samme plattformen og
+legger til cert-manager med en selvsignert sertifikattest. Profilene er gjensidig
+eksklusive, og den aktive profilen vises av `kube-launch status`.
+
 ```console
 kube-launch up --minimal
+kube-launch up --full     # utvidet profil med cert-manager
 kube-launch status
 kube-launch down
 kube-launch down --yes  # hopper over bekreftelsen
@@ -118,6 +123,30 @@ løpende synkroniseringen av plattformen.
 2. Root Application leser Application-filene under `platform/components/`.
 3. Hver child Application peker videre på sin egen mappe under `apps/`.
 4. Argo CD renderer Kustomize-filene og synkroniserer dem til clusteret.
+
+Fullprofilen bruker `profiles/full/root-application.yaml`, som kombinerer de
+samme felleskomponentene med profilspesifikke Applications.
+
+## Fullprofil og cert-manager
+
+Aktiver fullprofilen:
+
+```console
+kube-launch up --full
+```
+
+cert-manager installeres fra et pinnet Helm-chart med CRD-ene aktivert. En
+selvsignert `ClusterIssuer` oppretter et testsertifikat for `kubelaunch.local`.
+Kontroller resultatet med:
+
+```console
+make cert-status
+# eller:
+kubectl --context k3d-kubelaunch --namespace kubelaunch-system get certificate,secret
+```
+
+Bytt tilbake med `kube-launch up --minimal`. Argo CD fjerner da komponentene som
+bare tilhører fullprofilen.
 
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten

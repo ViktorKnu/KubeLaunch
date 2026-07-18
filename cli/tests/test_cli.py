@@ -24,6 +24,9 @@ def argocd_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
     monkeypatch.setattr(
+        "kube_launch.main.root_application_profile", lambda: "minimal"
+    )
+    monkeypatch.setattr(
         "kube_launch.main.application_status",
         lambda _name: ApplicationStatus(True, "Synced", "Healthy"),
     )
@@ -38,7 +41,7 @@ def bootstrap_spy(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     )
     monkeypatch.setattr(
         "kube_launch.main.apply_root_application",
-        lambda: calls.append("apply-root"),
+        lambda profile: calls.append(f"apply-root:{profile}"),
     )
     return calls
 
@@ -52,11 +55,16 @@ def test_help_lists_commands() -> None:
     assert "down" in result.stdout
 
 
-def test_up_requires_minimal_profile() -> None:
+def test_up_requires_exactly_one_profile() -> None:
     result = runner.invoke(app, ["up"])
 
     assert result.exit_code == 2
-    assert "kube-launch up --minimal" in result.output
+    assert "--minimal or --full" in result.output
+
+    both = runner.invoke(app, ["up", "--minimal", "--full"])
+
+    assert both.exit_code == 2
+    assert "--minimal or --full" in both.output
 
 
 def test_up_reports_all_missing_tools(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -84,7 +92,7 @@ def test_up_creates_cluster(
 
     assert result.exit_code == 0
     assert created == [True]
-    assert bootstrap_spy == ["install", "apply-root"]
+    assert bootstrap_spy == ["install", "apply-root:minimal"]
     assert "Cluster 'kubelaunch' created." in result.stdout
     assert "Kubernetes API is reachable." in result.stdout
 
@@ -105,7 +113,22 @@ def test_up_keeps_existing_cluster_unchanged(
 
     assert result.exit_code == 0
     assert "already exists; leaving it unchanged" in result.stdout
-    assert bootstrap_spy == ["install", "apply-root"]
+    assert bootstrap_spy == ["install", "apply-root:minimal"]
+
+
+def test_up_applies_full_profile(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+    bootstrap_spy: list[str],
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.wait_for_cluster", lambda: True)
+
+    result = runner.invoke(app, ["up", "--full"])
+
+    assert result.exit_code == 0
+    assert bootstrap_spy == ["install", "apply-root:full"]
+    assert "Root Argo CD Application applied (full)." in result.stdout
 
 
 def test_status_reports_reachable_cluster(
@@ -176,6 +199,9 @@ def test_status_reports_applications_still_syncing(
     )
     monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
     monkeypatch.setattr(
+        "kube_launch.main.root_application_profile", lambda: "minimal"
+    )
+    monkeypatch.setattr(
         "kube_launch.main.application_status",
         lambda _name: ApplicationStatus(True, "OutOfSync", "Progressing"),
     )
@@ -199,6 +225,9 @@ def test_status_reports_missing_application(
     )
     monkeypatch.setattr("kube_launch.main.root_application_exists", lambda: True)
     monkeypatch.setattr(
+        "kube_launch.main.root_application_profile", lambda: "minimal"
+    )
+    monkeypatch.setattr(
         "kube_launch.main.application_status",
         lambda name: (
             ApplicationStatus(False)
@@ -211,6 +240,23 @@ def test_status_reports_missing_application(
 
     assert result.exit_code == 1
     assert "AI demo frontend: missing" in result.stdout
+
+
+def test_status_includes_full_profile_applications(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+    argocd_ready: None,
+) -> None:
+    monkeypatch.setattr("kube_launch.main.cluster_exists", lambda: True)
+    monkeypatch.setattr("kube_launch.main.cluster_reachable", lambda: True)
+    monkeypatch.setattr("kube_launch.main.root_application_profile", lambda: "full")
+
+    result = runner.invoke(app, ["status"])
+
+    assert result.exit_code == 0
+    assert "Platform profile: full" in result.stdout
+    assert "cert-manager: Synced / Healthy" in result.stdout
+    assert "Certificate smoke test: Synced / Healthy" in result.stdout
 
 
 def test_status_stops_when_cluster_is_unreachable(

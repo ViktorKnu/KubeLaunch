@@ -220,6 +220,36 @@ def test_ai_frontend_service_matches_deployment() -> None:
         assert (directory / resource).is_file()
 
 
+def test_full_profile_installs_pinned_cert_manager_chart() -> None:
+    application = load_yaml("profiles/full/components/cert-manager-application.yaml")
+    source = application["spec"]["source"]
+    values = source["helm"]["valuesObject"]
+
+    assert source["repoURL"] == "https://charts.jetstack.io"
+    assert source["chart"] == "cert-manager"
+    assert source["targetRevision"] == "v1.21.0"
+    assert values["crds"]["enabled"] is True
+    assert application["spec"]["destination"]["namespace"] == "cert-manager"
+
+
+def test_cert_manager_smoke_test_issues_self_signed_certificate() -> None:
+    application = load_yaml(
+        "profiles/full/components/cert-manager-smoke-test-application.yaml"
+    )
+    issuer = load_yaml("apps/cert-manager-smoke-test/cluster-issuer.yaml")
+    certificate = load_yaml("apps/cert-manager-smoke-test/certificate.yaml")
+
+    assert application["spec"]["source"]["path"] == "apps/cert-manager-smoke-test"
+    assert application["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
+    assert issuer["kind"] == "ClusterIssuer"
+    assert issuer["spec"] == {"selfSigned": {}}
+    assert certificate["spec"]["secretName"] == "kubelaunch-selfsigned-tls"
+    assert certificate["spec"]["issuerRef"] == {
+        "name": "kubelaunch-selfsigned",
+        "kind": "ClusterIssuer",
+    }
+
+
 def test_kustomization_references_existing_resources() -> None:
     for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
         app_directory = REPOSITORY_ROOT / "apps" / app_name

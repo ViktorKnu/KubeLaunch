@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubelaunch
+  namespace: argocd
+  annotations:
+    kubelaunch.dev/profile: full
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/ViktorKnu/KubeLaunch.git
+      targetRevision: main
+      path: platform/components
+      directory:
+        recurse: true
+    - repoURL: https://github.com/ViktorKnu/KubeLaunch.git
+      targetRevision: main
+      path: profiles/full
+      directory:
+        recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

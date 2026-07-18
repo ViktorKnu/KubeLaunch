@@ -10,6 +10,7 @@ from kube_launch.argocd import (
     argocd_status,
     install_argocd,
     root_application_exists,
+    root_application_profile,
 )
 
 
@@ -116,6 +117,18 @@ def test_root_application_exists(monkeypatch: pytest.MonkeyPatch) -> None:
     assert root_application_exists() is True
 
 
+def test_root_application_profile_reads_annotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = '{"metadata":{"annotations":{"kubelaunch.dev/profile":"full"}}}'
+    monkeypatch.setattr(
+        "kube_launch.argocd.subprocess.run",
+        lambda *_args, **_kwargs: completed(stdout=payload),
+    )
+
+    assert root_application_profile() == "full"
+
+
 def test_application_status_reads_sync_and_health(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -159,9 +172,25 @@ def test_root_application_points_to_platform_directory() -> None:
 
     assert manifest["kind"] == "Application"
     assert manifest["metadata"]["namespace"] == "argocd"
+    assert manifest["metadata"]["annotations"]["kubelaunch.dev/profile"] == "minimal"
     assert manifest["spec"]["source"] == {
         "repoURL": "https://github.com/ViktorKnu/KubeLaunch.git",
         "targetRevision": "main",
         "path": "platform",
         "directory": {"recurse": True},
     }
+
+
+def test_full_root_application_combines_common_and_full_components() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    manifest = yaml.safe_load(
+        (repository_root / "profiles" / "full" / "root-application.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["metadata"]["annotations"]["kubelaunch.dev/profile"] == "full"
+    assert [source["path"] for source in manifest["spec"]["sources"]] == [
+        "platform/components",
+        "profiles/full",
+    ]

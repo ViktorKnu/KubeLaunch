@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kubelaunch
+  name: cert-manager-smoke-test
   namespace: argocd
   annotations:
-    kubelaunch.dev/profile: minimal
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,13 +12,19 @@ spec:
   source:
     repoURL: https://github.com/ViktorKnu/KubeLaunch.git
     targetRevision: main
-    path: platform
-    directory:
-      recurse: true
+    path: apps/cert-manager-smoke-test
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: kubelaunch-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m
