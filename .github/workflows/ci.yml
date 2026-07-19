@@ -79,6 +79,8 @@ jobs:
           kubectl kustomize apps/ai-demo/backend/k8s
           kubectl kustomize apps/ai-demo/frontend/k8s
           kubectl kustomize apps/cert-manager-smoke-test
+          kubectl kustomize apps/vault-bootstrap
+          kubectl kustomize apps/external-secrets-smoke-test
 
       - name: Build backend image
         run: docker build --tag kubelaunch-backend:ci apps/ai-demo/backend

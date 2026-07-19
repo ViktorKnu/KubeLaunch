@@ -38,7 +38,6 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 ## Dette venter til senere
 
 - automatisk TLS for frontenden med en offentlig issuer
-- External Secrets og Vault-integrasjon
 - `AIWorkload` CRD og operator
 - vLLM som alternativ runtime
 - canary-utrulling av modeller
@@ -82,8 +81,9 @@ Kubernetes API-et bindes til `127.0.0.1`. CLI-et venter i opptil to minutter på
 at API-et blir klart før bootstrapen fortsetter.
 
 `--minimal` kjører MVP-plattformen. `--full` bruker den samme plattformen og
-legger til cert-manager med en selvsignert sertifikattest. Profilene er gjensidig
-eksklusive, og den aktive profilen vises av `kube-launch status`.
+legger til cert-manager, External Secrets Operator og en lokal Vault-demo.
+Profilene er gjensidig eksklusive, og den aktive profilen vises av
+`kube-launch status`.
 
 ```console
 kube-launch up --minimal
@@ -147,6 +147,26 @@ kubectl --context k3d-kubelaunch --namespace kubelaunch-system get certificate,s
 
 Bytt tilbake med `kube-launch up --minimal`. Argo CD fjerner da komponentene som
 bare tilhører fullprofilen.
+
+## External Secrets og lokal Vault
+
+Fullprofilen kjører Vault i dev-modus og bruker en kjent lokal demo-token. En
+PostSync-jobb skriver en testverdi til Vault KV v2, og External Secrets Operator
+synkroniserer verdien til Kubernetes Secret `kubelaunch-vault-demo`.
+
+> Vault-oppsettet er usikkert, lagrer data i minnet og er kun ment for lokal
+> læring og demonstrasjon. Det må aldri brukes i produksjon.
+
+Kontroller hele secret-flyten:
+
+```console
+make secret-status
+# eller:
+kubectl --context k3d-kubelaunch --namespace kubelaunch-system get secretstore,externalsecret,secret
+```
+
+Åpne Vault lokalt med `make vault`, gå til `http://localhost:8200` og bruk
+tokenen `kubelaunch-dev-only`.
 
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten

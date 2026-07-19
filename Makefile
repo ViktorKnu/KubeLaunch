@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status ollama backend-image backend frontend-image frontend test lint validate
+.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status secret-status vault ollama backend-image backend frontend-image frontend test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -15,6 +15,8 @@ help: ## Show available development tasks
 	@echo "  make keda-status Show KEDA scaling resources"
 	@echo "  make backend-scale-status Show backend KEDA scaling resources"
 	@echo "  make cert-status Show cert-manager certificate resources"
+	@echo "  make secret-status Show External Secrets resources"
+	@echo "  make vault      Forward local dev Vault to http://localhost:8200"
 	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make backend-image Build and import the backend image into k3d"
 	@echo "  make backend    Forward the backend to http://localhost:8000"
@@ -54,6 +56,12 @@ backend-scale-status:
 cert-status:
 	kubectl --context k3d-kubelaunch --namespace kubelaunch-system get certificate,secret
 
+secret-status:
+	kubectl --context k3d-kubelaunch --namespace kubelaunch-system get secretstore,externalsecret,secret
+
+vault:
+	kubectl --context k3d-kubelaunch --namespace vault port-forward service/vault 8200:8200
+
 ollama:
 	kubectl --context k3d-kubelaunch --namespace ollama port-forward service/ollama 11434:11434
 
@@ -85,3 +93,5 @@ validate:
 	kubectl kustomize apps/ai-demo/backend/k8s
 	kubectl kustomize apps/ai-demo/frontend/k8s
 	kubectl kustomize apps/cert-manager-smoke-test
+	kubectl kustomize apps/vault-bootstrap
+	kubectl kustomize apps/external-secrets-smoke-test

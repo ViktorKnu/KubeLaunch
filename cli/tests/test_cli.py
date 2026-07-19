@@ -257,6 +257,10 @@ def test_status_includes_full_profile_applications(
     assert "Platform profile: full" in result.stdout
     assert "cert-manager: Synced / Healthy" in result.stdout
     assert "Certificate smoke test: Synced / Healthy" in result.stdout
+    assert "Vault (dev): Synced / Healthy" in result.stdout
+    assert "External Secrets: Synced / Healthy" in result.stdout
+    assert "Vault bootstrap: Synced / Healthy" in result.stdout
+    assert "External secret smoke test: Synced / Healthy" in result.stdout
 
 
 def test_status_stops_when_cluster_is_unreachable(

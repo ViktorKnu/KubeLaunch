@@ -41,6 +41,10 @@ PLATFORM_APPLICATIONS = (
 FULL_PLATFORM_APPLICATIONS = (
     ("cert-manager", "cert-manager"),
     ("cert-manager-smoke-test", "Certificate smoke test"),
+    ("vault", "Vault (dev)"),
+    ("external-secrets", "External Secrets"),
+    ("vault-bootstrap", "Vault bootstrap"),
+    ("external-secrets-smoke-test", "External secret smoke test"),
 )
 
 

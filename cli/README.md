@@ -26,8 +26,9 @@ kube-launch down
 `up --minimal` og `up --full` er idempotente og lar et eksisterende cluster være
 i fred. Minimalprofilen installerer MVP-plattformen. Fullprofilen bruker de samme
 komponentene og legger i tillegg til cert-manager med en selvsignert
-sertifikattest. Profilen kan byttes ved å kjøre den andre `up`-kommandoen;
-Argo CD synkroniserer og rydder komponentforskjellene.
+sertifikattest, External Secrets Operator og en lokal Vault-demo. Profilen kan
+byttes ved å kjøre den andre `up`-kommandoen; Argo CD synkroniserer og rydder
+komponentforskjellene.
 `status` sjekker om clusteret finnes, om Kubernetes API-et svarer og om alle
 forventede Argo CD-applikasjoner er `Synced` og `Healthy`.
 `down` ber om bekreftelse; bruk `down --yes` i automatiserte kjøringer.
@@ -45,7 +46,7 @@ komponenter skal etter hvert synkroniseres av Argo CD.
 Ollama, backend og frontend. Kommandoen viser også port-forward-kommandoer for
 frontenden, Grafana og Ollama. Den returnerer feilkode hvis en obligatorisk
 komponent mangler eller ikke er klar. For fullprofilen vises også cert-manager
-og sertifikattesten automatisk.
+sertifikattesten, Vault og External Secrets-flyten automatisk.
 
 Tester og lint kjøres slik:
 

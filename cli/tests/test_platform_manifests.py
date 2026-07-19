@@ -250,6 +250,74 @@ def test_cert_manager_smoke_test_issues_self_signed_certificate() -> None:
     }
 
 
+def test_full_profile_installs_pinned_vault_dev_chart() -> None:
+    application = load_yaml("profiles/full/components/vault-application.yaml")
+    source = application["spec"]["source"]
+    values = source["helm"]["valuesObject"]
+
+    assert source["repoURL"] == "https://helm.releases.hashicorp.com"
+    assert source["chart"] == "vault"
+    assert source["targetRevision"] == "0.33.0"
+    assert values["injector"]["enabled"] is False
+    assert values["server"]["dev"] == {
+        "enabled": True,
+        "devRootToken": "kubelaunch-dev-only",
+    }
+
+
+def test_full_profile_installs_pinned_external_secrets_chart() -> None:
+    application = load_yaml(
+        "profiles/full/components/external-secrets-application.yaml"
+    )
+    source = application["spec"]["source"]
+    values = source["helm"]["valuesObject"]
+
+    assert source["repoURL"] == "https://charts.external-secrets.io"
+    assert source["chart"] == "external-secrets"
+    assert source["targetRevision"] == "2.5.0"
+    assert values["installCRDs"] is True
+    assert values["serviceMonitor"]["renderMode"] == "alwaysRender"
+
+
+def test_vault_bootstrap_writes_demo_secret() -> None:
+    token = load_yaml("apps/vault-bootstrap/token-secret.yaml")
+    job = load_yaml("apps/vault-bootstrap/bootstrap-job.yaml")
+    container = job["spec"]["template"]["spec"]["containers"][0]
+
+    assert token["stringData"]["token"] == "kubelaunch-dev-only"
+    assert job["metadata"]["annotations"]["argocd.argoproj.io/hook"] == "PostSync"
+    assert container["image"] == "hashicorp/vault:2.0.2"
+    assert "vault kv put secret/kubelaunch/demo" in container["args"][0]
+    assert {item["name"] for item in container["env"]} == {
+        "VAULT_ADDR",
+        "VAULT_TOKEN",
+    }
+
+
+def test_external_secret_reads_vault_kv_value() -> None:
+    store = load_yaml("apps/external-secrets-smoke-test/secret-store.yaml")
+    external_secret = load_yaml(
+        "apps/external-secrets-smoke-test/external-secret.yaml"
+    )
+    vault = store["spec"]["provider"]["vault"]
+
+    assert vault["server"] == "http://vault.vault.svc.cluster.local:8200"
+    assert vault["path"] == "secret"
+    assert vault["version"] == "v2"
+    assert vault["auth"]["tokenSecretRef"] == {
+        "name": "vault-dev-token",
+        "key": "token",
+    }
+    assert external_secret["spec"]["target"]["name"] == "kubelaunch-vault-demo"
+    assert external_secret["spec"]["data"][0] == {
+        "secretKey": "message",
+        "remoteRef": {
+            "key": "kubelaunch/demo",
+            "property": "message",
+        },
+    }
+
+
 def test_kustomization_references_existing_resources() -> None:
     for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
         app_directory = REPOSITORY_ROOT / "apps" / app_name
