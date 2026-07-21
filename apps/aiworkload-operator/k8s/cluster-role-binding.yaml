@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aiworkload-operator
+  labels:
+    app.kubernetes.io/name: aiworkload-operator
+    app.kubernetes.io/part-of: kubelaunch
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aiworkload-operator
+subjects:
+  - kind: ServiceAccount
+    name: aiworkload-operator
+    namespace: kubelaunch-operator

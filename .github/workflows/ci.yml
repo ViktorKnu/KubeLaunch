@@ -81,9 +81,14 @@ jobs:
           kubectl kustomize apps/cert-manager-smoke-test
           kubectl kustomize apps/vault-bootstrap
           kubectl kustomize apps/external-secrets-smoke-test
+          kubectl kustomize apps/aiworkload-operator/k8s
+          kubectl kustomize apps/aiworkload-smoke-test
 
       - name: Build backend image
         run: docker build --tag kubelaunch-backend:ci apps/ai-demo/backend
 
       - name: Build frontend image
         run: docker build --tag kubelaunch-frontend:ci apps/ai-demo/frontend
+
+      - name: Build AIWorkload operator image
+        run: docker build --tag kubelaunch-aiworkload-operator:ci apps/aiworkload-operator

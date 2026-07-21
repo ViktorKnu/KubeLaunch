@@ -45,6 +45,8 @@ FULL_PLATFORM_APPLICATIONS = (
     ("external-secrets", "External Secrets"),
     ("vault-bootstrap", "Vault bootstrap"),
     ("external-secrets-smoke-test", "External secret smoke test"),
+    ("aiworkload-operator", "AIWorkload operator"),
+    ("aiworkload-smoke-test", "AIWorkload smoke test"),
 )
 
 

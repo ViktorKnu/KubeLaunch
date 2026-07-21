@@ -1,0 +1,48 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aiworkload-operator
+  labels:
+    app.kubernetes.io/name: aiworkload-operator
+    app.kubernetes.io/part-of: kubelaunch
+rules:
+  - apiGroups:
+      - platform.kubelaunch.dev
+    resources:
+      - aiworkloads
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - platform.kubelaunch.dev
+    resources:
+      - aiworkloads/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+      - delete

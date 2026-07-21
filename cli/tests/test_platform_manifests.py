@@ -318,6 +318,55 @@ def test_external_secret_reads_vault_kv_value() -> None:
     }
 
 
+def test_aiworkload_crd_has_status_and_defaults() -> None:
+    crd = load_yaml("apps/aiworkload-operator/k8s/crd.yaml")
+    version = crd["spec"]["versions"][0]
+    spec_schema = version["schema"]["openAPIV3Schema"]["properties"]["spec"]
+
+    assert crd["metadata"]["name"] == "aiworkloads.platform.kubelaunch.dev"
+    assert crd["spec"]["scope"] == "Namespaced"
+    assert version["name"] == "v1alpha1"
+    assert version["subresources"] == {"status": {}}
+    assert spec_schema["required"] == ["model"]
+    assert spec_schema["properties"]["replicas"]["default"] == 1
+    assert spec_schema["properties"]["replicas"]["maximum"] == 5
+
+
+def test_aiworkload_operator_has_required_rbac() -> None:
+    role = load_yaml("apps/aiworkload-operator/k8s/cluster-role.yaml")
+    deployment = load_yaml("apps/aiworkload-operator/k8s/deployment.yaml")
+    resources = {
+        resource
+        for rule in role["rules"]
+        for resource in rule["resources"]
+    }
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+
+    assert {"aiworkloads", "aiworkloads/status", "deployments", "services"} <= (
+        resources
+    )
+    assert container["image"] == "kubelaunch-aiworkload-operator:dev"
+    assert deployment["spec"]["template"]["spec"]["serviceAccountName"] == (
+        "aiworkload-operator"
+    )
+
+
+def test_full_profile_deploys_operator_before_example() -> None:
+    operator = load_yaml(
+        "profiles/full/components/aiworkload-operator-application.yaml"
+    )
+    smoke_test = load_yaml(
+        "profiles/full/components/aiworkload-smoke-test-application.yaml"
+    )
+    workload = load_yaml("apps/aiworkload-smoke-test/aiworkload.yaml")
+
+    assert operator["spec"]["source"]["path"] == "apps/aiworkload-operator/k8s"
+    assert operator["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "0"
+    assert smoke_test["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
+    assert workload["kind"] == "AIWorkload"
+    assert workload["spec"]["model"] == "tinyllama"
+
+
 def test_kustomization_references_existing_resources() -> None:
     for app_name in ("platform-smoke-test", "keda-smoke-test", "ollama"):
         app_directory = REPOSITORY_ROOT / "apps" / app_name

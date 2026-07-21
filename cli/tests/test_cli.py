@@ -261,6 +261,8 @@ def test_status_includes_full_profile_applications(
     assert "External Secrets: Synced / Healthy" in result.stdout
     assert "Vault bootstrap: Synced / Healthy" in result.stdout
     assert "External secret smoke test: Synced / Healthy" in result.stdout
+    assert "AIWorkload operator: Synced / Healthy" in result.stdout
+    assert "AIWorkload smoke test: Synced / Healthy" in result.stdout
 
 
 def test_status_stops_when_cluster_is_unreachable(

@@ -12,3 +12,7 @@ Fullprofilen inkluderer også External Secrets Operator og en lokal Vault i
 dev-modus. En bootstrap-jobb skriver en testverdi til Vault, og en
 `ExternalSecret` synkroniserer verdien til et Kubernetes Secret. Vault-data og
 den kjente demo-tokenen er flyktige og må aldri brukes i produksjon.
+
+`AIWorkload`-operatoren er den første plattform-API-utvidelsen. Den namespaced
+CR-en beskriver modell, runtime, image og replikaer; operatoren oppretter og
+vedlikeholder backend Deployment og Service.

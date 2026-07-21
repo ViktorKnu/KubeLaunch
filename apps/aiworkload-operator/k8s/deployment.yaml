@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiworkload-operator
+  labels:
+    app.kubernetes.io/name: aiworkload-operator
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aiworkload-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aiworkload-operator
+        app.kubernetes.io/part-of: kubelaunch
+    spec:
+      serviceAccountName: aiworkload-operator
+      automountServiceAccountToken: true
+      containers:
+        - name: operator
+          image: kubelaunch-aiworkload-operator:dev
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

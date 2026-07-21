@@ -38,7 +38,6 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 ## Dette venter til senere
 
 - automatisk TLS for frontenden med en offentlig issuer
-- `AIWorkload` CRD og operator
 - vLLM som alternativ runtime
 - canary-utrulling av modeller
 - automatisk oppsett i skyen
@@ -82,6 +81,7 @@ at API-et blir klart før bootstrapen fortsetter.
 
 `--minimal` kjører MVP-plattformen. `--full` bruker den samme plattformen og
 legger til cert-manager, External Secrets Operator og en lokal Vault-demo.
+Fullprofilen inkluderer også en `AIWorkload` CRD og operator.
 Profilene er gjensidig eksklusive, og den aktive profilen vises av
 `kube-launch status`.
 
@@ -167,6 +167,28 @@ kubectl --context k3d-kubelaunch --namespace kubelaunch-system get secretstore,e
 
 Åpne Vault lokalt med `make vault`, gå til `http://localhost:8200` og bruk
 tokenen `kubelaunch-dev-only`.
+
+## AIWorkload-operator
+
+Fullprofilen tilbyr et lite plattform-API for AI-backender. En `AIWorkload`
+beskriver modell, runtime-URL, container-image og antall replikaer. Operatoren
+oppretter og vedlikeholder en Deployment og Service og skriver observert status
+tilbake på CR-en.
+
+Bygg operator-imaget før fullprofilen aktiveres:
+
+```console
+make operator-image
+python -m kube_launch up --full
+```
+
+Kontroller eksempelet:
+
+```console
+make aiworkload-status
+# eller:
+kubectl --context k3d-kubelaunch --namespace ai-workloads get aiworkload,deployment,service
+```
 
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten

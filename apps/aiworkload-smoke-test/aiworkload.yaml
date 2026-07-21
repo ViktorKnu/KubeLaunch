@@ -1,0 +1,12 @@
+apiVersion: platform.kubelaunch.dev/v1alpha1
+kind: AIWorkload
+metadata:
+  name: operator-demo
+  labels:
+    app.kubernetes.io/name: operator-demo
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  model: tinyllama
+  image: kubelaunch-backend:dev
+  runtimeURL: http://ollama.ollama.svc.cluster.local:11434
+  replicas: 1

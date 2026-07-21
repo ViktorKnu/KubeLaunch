@@ -1,0 +1,73 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: aiworkloads.platform.kubelaunch.dev
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  group: platform.kubelaunch.dev
+  scope: Namespaced
+  names:
+    plural: aiworkloads
+    singular: aiworkload
+    kind: AIWorkload
+    shortNames:
+      - aiw
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Model
+          type: string
+          jsonPath: .spec.model
+        - name: Replicas
+          type: integer
+          jsonPath: .spec.replicas
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - model
+              properties:
+                model:
+                  type: string
+                  minLength: 1
+                image:
+                  type: string
+                  default: kubelaunch-backend:dev
+                runtimeURL:
+                  type: string
+                  default: http://ollama.ollama.svc.cluster.local:11434
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 1
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                deploymentName:
+                  type: string
+                serviceName:
+                  type: string
+                model:
+                  type: string

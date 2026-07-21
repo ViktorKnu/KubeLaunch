@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status secret-status vault ollama backend-image backend frontend-image frontend test lint validate
+.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status secret-status aiworkload-status vault ollama backend-image backend frontend-image frontend operator-image test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -16,12 +16,14 @@ help: ## Show available development tasks
 	@echo "  make backend-scale-status Show backend KEDA scaling resources"
 	@echo "  make cert-status Show cert-manager certificate resources"
 	@echo "  make secret-status Show External Secrets resources"
+	@echo "  make aiworkload-status Show AIWorkload and generated resources"
 	@echo "  make vault      Forward local dev Vault to http://localhost:8200"
 	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make backend-image Build and import the backend image into k3d"
 	@echo "  make backend    Forward the backend to http://localhost:8000"
 	@echo "  make frontend-image Build and import the frontend image into k3d"
 	@echo "  make frontend   Forward the frontend to http://localhost:8080"
+	@echo "  make operator-image Build and import the AIWorkload operator image"
 	@echo "  make test       Run available tests"
 	@echo "  make lint       Run available linters"
 	@echo "  make validate   Validate platform definitions"
@@ -59,6 +61,9 @@ cert-status:
 secret-status:
 	kubectl --context k3d-kubelaunch --namespace kubelaunch-system get secretstore,externalsecret,secret
 
+aiworkload-status:
+	kubectl --context k3d-kubelaunch --namespace ai-workloads get aiworkload,deployment,service
+
 vault:
 	kubectl --context k3d-kubelaunch --namespace vault port-forward service/vault 8200:8200
 
@@ -79,6 +84,10 @@ frontend-image:
 frontend:
 	kubectl --context k3d-kubelaunch --namespace ai-demo port-forward service/ai-demo-frontend 8080:8080
 
+operator-image:
+	docker build --tag kubelaunch-aiworkload-operator:dev apps/aiworkload-operator
+	k3d image import kubelaunch-aiworkload-operator:dev --cluster kubelaunch
+
 test:
 	python -m pytest
 
@@ -95,3 +104,5 @@ validate:
 	kubectl kustomize apps/cert-manager-smoke-test
 	kubectl kustomize apps/vault-bootstrap
 	kubectl kustomize apps/external-secrets-smoke-test
+	kubectl kustomize apps/aiworkload-operator/k8s
+	kubectl kustomize apps/aiworkload-smoke-test

@@ -36,8 +36,12 @@ where = ["cli"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
-pythonpath = ["cli", "apps/ai-demo/backend"]
-testpaths = ["cli/tests", "apps/ai-demo/backend/tests"]
+pythonpath = ["cli", "apps/ai-demo/backend", "apps/aiworkload-operator"]
+testpaths = [
+    "cli/tests",
+    "apps/ai-demo/backend/tests",
+    "apps/aiworkload-operator/tests",
+]
 
 [tool.ruff]
 line-length = 88
