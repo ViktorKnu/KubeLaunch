@@ -2,7 +2,8 @@ import asyncio
 from collections.abc import AsyncIterator
 
 import httpx
-from app.main import app, get_ollama_client
+from app import main
+from app.main import app, get_runtime_client
 
 
 async def request(
@@ -20,17 +21,17 @@ async def request(
 
 
 async def prompt_request(
-    ollama_transport: httpx.MockTransport,
+    runtime_transport: httpx.MockTransport,
     prompt: str,
 ) -> httpx.Response:
     async def override_client() -> AsyncIterator[httpx.AsyncClient]:
         async with httpx.AsyncClient(
-            base_url="http://ollama.test",
-            transport=ollama_transport,
+            base_url="http://runtime.test",
+            transport=runtime_transport,
         ) as client:
             yield client
 
-    app.dependency_overrides[get_ollama_client] = override_client
+    app.dependency_overrides[get_runtime_client] = override_client
     try:
         return await request("POST", "/api/prompt", json={"prompt": prompt})
     finally:
@@ -41,7 +42,11 @@ def test_health_reports_model() -> None:
     response = asyncio.run(request("GET", "/health"))
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "model": "tinyllama"}
+    assert response.json() == {
+        "status": "ok",
+        "model": "tinyllama",
+        "runtime": "ollama",
+    }
 
 
 def test_prompt_returns_ollama_answer() -> None:
@@ -58,7 +63,7 @@ def test_prompt_returns_ollama_answer() -> None:
     assert response.json()["answer"] == "Et kort svar."
     assert response.json()["model"] == "tinyllama"
     assert response.json()["response_time_ms"] >= 0
-    assert captured_request["url"] == "http://ollama.test/api/generate"
+    assert captured_request["url"] == "http://runtime.test/api/generate"
     assert b'"stream":false' in captured_request["body"]
 
 
@@ -78,7 +83,32 @@ def test_prompt_maps_ollama_failure_to_bad_gateway() -> None:
     response = asyncio.run(prompt_request(httpx.MockTransport(handler), "Hei"))
 
     assert response.status_code == 502
-    assert response.json() == {"detail": "Ollama request failed"}
+    assert response.json() == {"detail": "AI runtime request failed"}
+
+
+def test_prompt_maps_vllm_openai_compatible_response(monkeypatch) -> None:
+    captured_request: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured_request["url"] = str(request.url)
+        captured_request["body"] = request.content
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "Svar fra vLLM."}}]},
+        )
+
+    monkeypatch.setattr(main, "AI_RUNTIME", "vllm")
+    monkeypatch.setattr(main, "AI_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
+    response = asyncio.run(
+        prompt_request(httpx.MockTransport(handler), "Hei vLLM")
+    )
+
+    assert response.status_code == 200
+    assert response.json()["answer"] == "Svar fra vLLM."
+    assert response.json()["model"] == "Qwen/Qwen2.5-0.5B-Instruct"
+    assert captured_request["url"] == "http://runtime.test/v1/chat/completions"
+    assert b'"role":"user"' in captured_request["body"]
+    assert b'"content":"Hei vLLM"' in captured_request["body"]
 
 
 def test_metrics_expose_prompt_counter() -> None:

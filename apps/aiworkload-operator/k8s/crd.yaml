@@ -23,6 +23,9 @@ spec:
         - name: Model
           type: string
           jsonPath: .spec.model
+        - name: Runtime
+          type: string
+          jsonPath: .spec.runtime
         - name: Replicas
           type: integer
           jsonPath: .spec.replicas
@@ -46,12 +49,18 @@ spec:
                 model:
                   type: string
                   minLength: 1
+                runtime:
+                  type: string
+                  enum:
+                    - ollama
+                    - vllm
+                  default: ollama
                 image:
                   type: string
                   default: kubelaunch-backend:dev
                 runtimeURL:
                   type: string
-                  default: http://ollama.ollama.svc.cluster.local:11434
+                  minLength: 1
                 replicas:
                   type: integer
                   minimum: 1
@@ -70,4 +79,6 @@ spec:
                 serviceName:
                   type: string
                 model:
+                  type: string
+                runtime:
                   type: string

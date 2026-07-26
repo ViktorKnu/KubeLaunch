@@ -29,8 +29,9 @@ def test_build_deployment_maps_aiworkload_spec() -> None:
     assert deployment["metadata"]["namespace"] == "ai-workloads"
     assert deployment["spec"]["replicas"] == 2
     assert container["image"] == "example/backend:v1"
-    assert environment["OLLAMA_MODEL"] == "tinyllama"
-    assert environment["OLLAMA_BASE_URL"] == "http://ollama.example:11434"
+    assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_MODEL"] == "tinyllama"
+    assert environment["AI_RUNTIME_BASE_URL"] == "http://ollama.example:11434"
 
 
 def test_generated_resources_are_owned_by_aiworkload() -> None:
@@ -70,8 +71,25 @@ def test_defaults_use_local_backend_and_ollama() -> None:
 
     assert deployment["spec"]["replicas"] == 1
     assert container["image"] == "kubelaunch-backend:dev"
-    assert environment["OLLAMA_BASE_URL"] == (
+    assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_RUNTIME_BASE_URL"] == (
         "http://ollama.ollama.svc.cluster.local:11434"
+    )
+
+
+def test_vllm_uses_openai_compatible_service_by_default() -> None:
+    resource = aiworkload()
+    resource["spec"] = {
+        "model": "Qwen/Qwen2.5-0.5B-Instruct",
+        "runtime": "vllm",
+    }
+    deployment = build_deployment(resource)
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    environment = {item["name"]: item["value"] for item in container["env"]}
+
+    assert environment["AI_RUNTIME"] == "vllm"
+    assert environment["AI_RUNTIME_BASE_URL"] == (
+        "http://vllm.vllm.svc.cluster.local:8000"
     )
 
 
@@ -82,4 +100,5 @@ def test_status_records_the_observed_generation() -> None:
         "deploymentName": "demo",
         "serviceName": "demo",
         "model": "tinyllama",
+        "runtime": "ollama",
     }

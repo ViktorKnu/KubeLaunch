@@ -1,0 +1,10 @@
+apiVersion: platform.kubelaunch.dev/v1alpha1
+kind: AIWorkload
+metadata:
+  name: vllm-demo
+  namespace: ai-workloads
+spec:
+  runtime: vllm
+  runtimeURL: http://vllm.vllm.svc.cluster.local:8000
+  model: Qwen/Qwen2.5-0.5B-Instruct
+  replicas: 1

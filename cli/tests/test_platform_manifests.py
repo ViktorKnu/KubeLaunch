@@ -141,7 +141,8 @@ def test_ai_backend_connects_to_ollama_and_includes_keda() -> None:
 
     assert deployment["spec"]["replicas"] == 1
     assert container["image"] == "kubelaunch-backend:dev"
-    assert environment["OLLAMA_BASE_URL"] == (
+    assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_RUNTIME_BASE_URL"] == (
         "http://ollama.ollama.svc.cluster.local:11434"
     )
     assert "scaled-object.yaml" in kustomization["resources"]
@@ -327,7 +328,18 @@ def test_aiworkload_crd_has_status_and_defaults() -> None:
     assert crd["spec"]["scope"] == "Namespaced"
     assert version["name"] == "v1alpha1"
     assert version["subresources"] == {"status": {}}
+    assert version["additionalPrinterColumns"][1] == {
+        "name": "Runtime",
+        "type": "string",
+        "jsonPath": ".spec.runtime",
+    }
     assert spec_schema["required"] == ["model"]
+    assert spec_schema["properties"]["runtime"] == {
+        "type": "string",
+        "enum": ["ollama", "vllm"],
+        "default": "ollama",
+    }
+    assert "default" not in spec_schema["properties"]["runtimeURL"]
     assert spec_schema["properties"]["replicas"]["default"] == 1
     assert spec_schema["properties"]["replicas"]["maximum"] == 5
 

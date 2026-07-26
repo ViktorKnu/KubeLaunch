@@ -22,11 +22,13 @@ spec:
           image: kubelaunch-backend:dev
           imagePullPolicy: IfNotPresent
           env:
-            - name: OLLAMA_BASE_URL
+            - name: AI_RUNTIME
+              value: ollama
+            - name: AI_RUNTIME_BASE_URL
               value: http://ollama.ollama.svc.cluster.local:11434
-            - name: OLLAMA_MODEL
+            - name: AI_MODEL
               value: tinyllama
-            - name: OLLAMA_TIMEOUT_SECONDS
+            - name: AI_TIMEOUT_SECONDS
               value: "120"
           ports:
             - name: http

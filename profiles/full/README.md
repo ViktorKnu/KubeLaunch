@@ -15,4 +15,5 @@ den kjente demo-tokenen er flyktige og må aldri brukes i produksjon.
 
 `AIWorkload`-operatoren er den første plattform-API-utvidelsen. Den namespaced
 CR-en beskriver modell, runtime, image og replikaer; operatoren oppretter og
-vedlikeholder backend Deployment og Service.
+vedlikeholder backend Deployment og Service. Ollama er standard, mens `vllm`
+kan velges for en eksisterende OpenAI-kompatibel vLLM-server.

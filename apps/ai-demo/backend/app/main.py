@@ -1,4 +1,4 @@
-"""FastAPI backend that forwards prompts to the local Ollama runtime."""
+"""FastAPI backend that forwards prompts to a configured AI runtime."""
 
 import os
 import time
@@ -17,11 +17,20 @@ from prometheus_client import (
 )
 from pydantic import BaseModel, Field, field_validator
 
-OLLAMA_BASE_URL = os.getenv(
-    "OLLAMA_BASE_URL", "http://ollama.ollama.svc.cluster.local:11434"
+AI_RUNTIME = os.getenv("AI_RUNTIME", "ollama").lower()
+AI_RUNTIME_BASE_URL = os.getenv(
+    "AI_RUNTIME_BASE_URL",
+    os.getenv("OLLAMA_BASE_URL", "http://ollama.ollama.svc.cluster.local:11434"),
 )
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama")
-OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
+AI_MODEL = os.getenv("AI_MODEL", os.getenv("OLLAMA_MODEL", "tinyllama"))
+AI_TIMEOUT_SECONDS = float(
+    os.getenv("AI_TIMEOUT_SECONDS", os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
+)
+AI_RUNTIME_API_KEY = os.getenv("AI_RUNTIME_API_KEY")
+SUPPORTED_RUNTIMES = {"ollama", "vllm"}
+
+if AI_RUNTIME not in SUPPORTED_RUNTIMES:
+    raise RuntimeError(f"Unsupported AI runtime: {AI_RUNTIME}")
 
 PROMPT_REQUESTS = Counter(
     "kubelaunch_prompt_requests_total",
@@ -30,12 +39,12 @@ PROMPT_REQUESTS = Counter(
 )
 PROMPT_DURATION = Histogram(
     "kubelaunch_prompt_duration_seconds",
-    "Time spent waiting for an Ollama prompt response.",
+    "Time spent waiting for an AI runtime prompt response.",
     buckets=(0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120),
 )
 PROMPT_IN_PROGRESS = Gauge(
     "kubelaunch_prompt_requests_in_progress",
-    "Number of prompts currently waiting for an Ollama response.",
+    "Number of prompts currently waiting for an AI runtime response.",
 )
 for metric_status in ("success", "error"):
     PROMPT_REQUESTS.labels(status=metric_status)
@@ -65,9 +74,16 @@ class PromptResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-    timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS)
-    async with httpx.AsyncClient(base_url=OLLAMA_BASE_URL, timeout=timeout) as client:
-        application.state.ollama_client = client
+    timeout = httpx.Timeout(AI_TIMEOUT_SECONDS)
+    headers = {}
+    if AI_RUNTIME_API_KEY:
+        headers["Authorization"] = f"Bearer {AI_RUNTIME_API_KEY}"
+    async with httpx.AsyncClient(
+        base_url=AI_RUNTIME_BASE_URL,
+        timeout=timeout,
+        headers=headers,
+    ) as client:
+        application.state.runtime_client = client
         yield
 
 
@@ -78,14 +94,47 @@ app = FastAPI(
 )
 
 
-def get_ollama_client(request: Request) -> httpx.AsyncClient:
-    return request.app.state.ollama_client
+def get_runtime_client(request: Request) -> httpx.AsyncClient:
+    return request.app.state.runtime_client
+
+
+def build_runtime_request(prompt: str) -> tuple[str, dict[str, object]]:
+    """Map the stable backend API to the selected runtime protocol."""
+    if AI_RUNTIME == "ollama":
+        return "/api/generate", {
+            "model": AI_MODEL,
+            "prompt": prompt,
+            "stream": False,
+        }
+    return "/v1/chat/completions", {
+        "model": AI_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+    }
+
+
+def extract_answer(payload: dict[str, object]) -> str:
+    """Extract response text from Ollama or OpenAI-compatible vLLM JSON."""
+    if AI_RUNTIME == "ollama":
+        answer = payload.get("response")
+    else:
+        choices = payload.get("choices")
+        answer = None
+        if isinstance(choices, list) and choices:
+            choice = choices[0]
+            if isinstance(choice, dict):
+                message = choice.get("message")
+                if isinstance(message, dict):
+                    answer = message.get("content")
+    if not isinstance(answer, str) or not answer:
+        raise ValueError(f"{AI_RUNTIME} response did not contain text")
+    return answer
 
 
 @app.get("/health")
 async def health() -> dict[str, str]:
     """Report process health without invoking the model."""
-    return {"status": "ok", "model": OLLAMA_MODEL}
+    return {"status": "ok", "model": AI_MODEL, "runtime": AI_RUNTIME}
 
 
 @app.get("/metrics", include_in_schema=False)
@@ -97,31 +146,25 @@ async def metrics() -> Response:
 @app.post("/api/prompt", response_model=PromptResponse)
 async def prompt(
     payload: PromptRequest,
-    client: Annotated[httpx.AsyncClient, Depends(get_ollama_client)],
+    client: Annotated[httpx.AsyncClient, Depends(get_runtime_client)],
 ) -> PromptResponse:
-    """Send one non-streaming prompt to Ollama and return its answer."""
+    """Send one non-streaming prompt to the runtime and return its answer."""
     started_at = time.perf_counter()
     metric_status = "error"
     PROMPT_IN_PROGRESS.inc()
     try:
-        response = await client.post(
-            "/api/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": payload.prompt,
-                "stream": False,
-            },
-        )
+        path, runtime_payload = build_runtime_request(payload.prompt)
+        response = await client.post(path, json=runtime_payload)
         response.raise_for_status()
-        ollama_payload = response.json()
-        answer = ollama_payload.get("response")
-        if not isinstance(answer, str):
-            raise ValueError("Ollama response did not contain text")
+        answer = extract_answer(response.json())
         metric_status = "success"
     except httpx.TimeoutException as error:
-        raise HTTPException(status_code=504, detail="Ollama timed out") from error
+        raise HTTPException(status_code=504, detail="AI runtime timed out") from error
     except (httpx.HTTPError, ValueError) as error:
-        raise HTTPException(status_code=502, detail="Ollama request failed") from error
+        raise HTTPException(
+            status_code=502,
+            detail="AI runtime request failed",
+        ) from error
     finally:
         elapsed_seconds = time.perf_counter() - started_at
         PROMPT_IN_PROGRESS.dec()
@@ -130,6 +173,6 @@ async def prompt(
 
     return PromptResponse(
         answer=answer,
-        model=OLLAMA_MODEL,
+        model=AI_MODEL,
         response_time_ms=round(elapsed_seconds * 1000, 1),
     )

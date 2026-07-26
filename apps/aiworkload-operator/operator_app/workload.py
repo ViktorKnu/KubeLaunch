@@ -3,7 +3,11 @@
 API_VERSION = "platform.kubelaunch.dev/v1alpha1"
 KIND = "AIWorkload"
 DEFAULT_IMAGE = "kubelaunch-backend:dev"
-DEFAULT_RUNTIME_URL = "http://ollama.ollama.svc.cluster.local:11434"
+DEFAULT_RUNTIME = "ollama"
+DEFAULT_RUNTIME_URLS = {
+    "ollama": "http://ollama.ollama.svc.cluster.local:11434",
+    "vllm": "http://vllm.vllm.svc.cluster.local:8000",
+}
 
 
 def _owner_reference(resource: dict) -> list[dict]:
@@ -39,6 +43,7 @@ def build_status(resource: dict) -> dict:
         "deploymentName": name,
         "serviceName": name,
         "model": resource["spec"]["model"],
+        "runtime": resource["spec"].get("runtime", DEFAULT_RUNTIME),
     }
 
 
@@ -48,6 +53,8 @@ def build_deployment(resource: dict) -> dict:
     spec = resource["spec"]
     name = metadata["name"]
     labels = _labels(name)
+    runtime = spec.get("runtime", DEFAULT_RUNTIME)
+    runtime_url = spec.get("runtimeURL", DEFAULT_RUNTIME_URLS[runtime])
 
     return {
         "apiVersion": "apps/v1",
@@ -74,14 +81,16 @@ def build_deployment(resource: dict) -> dict:
                             "imagePullPolicy": "IfNotPresent",
                             "env": [
                                 {
-                                    "name": "OLLAMA_BASE_URL",
-                                    "value": spec.get(
-                                        "runtimeURL", DEFAULT_RUNTIME_URL
-                                    ),
+                                    "name": "AI_RUNTIME",
+                                    "value": runtime,
                                 },
-                                {"name": "OLLAMA_MODEL", "value": spec["model"]},
                                 {
-                                    "name": "OLLAMA_TIMEOUT_SECONDS",
+                                    "name": "AI_RUNTIME_BASE_URL",
+                                    "value": runtime_url,
+                                },
+                                {"name": "AI_MODEL", "value": spec["model"]},
+                                {
+                                    "name": "AI_TIMEOUT_SECONDS",
                                     "value": "120",
                                 },
                             ],

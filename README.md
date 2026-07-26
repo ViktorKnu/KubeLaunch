@@ -38,7 +38,6 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 ## Dette venter til senere
 
 - automatisk TLS for frontenden med en offentlig issuer
-- vLLM som alternativ runtime
 - canary-utrulling av modeller
 - automatisk oppsett i skyen
 
@@ -171,7 +170,8 @@ tokenen `kubelaunch-dev-only`.
 ## AIWorkload-operator
 
 Fullprofilen tilbyr et lite plattform-API for AI-backender. En `AIWorkload`
-beskriver modell, runtime-URL, container-image og antall replikaer. Operatoren
+beskriver modell, runtime, runtime-URL, container-image og antall replikaer.
+Runtime kan være lokal Ollama eller en OpenAI-kompatibel vLLM-server. Operatoren
 oppretter og vedlikeholder en Deployment og Service og skriver observert status
 tilbake på CR-en.
 
@@ -189,6 +189,22 @@ make aiworkload-status
 # eller:
 kubectl --context k3d-kubelaunch --namespace ai-workloads get aiworkload,deployment,service
 ```
+
+For vLLM, pek en workload på en eksisterende server:
+
+```yaml
+apiVersion: platform.kubelaunch.dev/v1alpha1
+kind: AIWorkload
+metadata:
+  name: vllm-demo
+spec:
+  runtime: vllm
+  runtimeURL: http://vllm.vllm.svc.cluster.local:8000
+  model: Qwen/Qwen2.5-0.5B-Instruct
+```
+
+Selve vLLM-serveren installeres ikke av KubeLaunch. Dermed forblir den lokale
+CPU-demoen lett, mens samme backend-API kan brukes mot en separat vLLM-runtime.
 
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten

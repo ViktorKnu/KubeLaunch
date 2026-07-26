@@ -23,5 +23,6 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 12. Pusse opp dokumentasjon, demo og CI (fullført)
 
 Etter MVP-en er `--full`-modus, cert-manager og en lokal External Secrets/Vault-
-demo og en `AIWorkload`-operator lagt til. Prosjektet kan videre utvides med
-vLLM, canary-utrulling og guider for kjøring i skyen.
+demo og en `AIWorkload`-operator lagt til. Operator-workloads kan nå bruke både
+Ollama og et OpenAI-kompatibelt vLLM-endepunkt. Prosjektet kan videre utvides
+med canary-utrulling og guider for kjøring i skyen.
