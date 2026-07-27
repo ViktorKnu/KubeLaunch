@@ -1,0 +1,11 @@
+apiVersion: platform.kubelaunch.dev/v1alpha1
+kind: AIWorkload
+metadata:
+  name: model-rollout
+  namespace: ai-workloads
+spec:
+  model: tinyllama
+  replicas: 3
+  canary:
+    model: qwen2:0.5b
+    replicas: 1

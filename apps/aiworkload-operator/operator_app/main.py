@@ -6,7 +6,12 @@ import time
 from kubernetes import client, config, watch
 from kubernetes.client.exceptions import ApiException
 
-from operator_app.workload import build_deployment, build_service, build_status
+from operator_app.workload import (
+    build_canary_deployment,
+    build_deployment,
+    build_service,
+    build_status_patch,
+)
 
 GROUP = "platform.kubelaunch.dev"
 VERSION = "v1alpha1"
@@ -41,6 +46,14 @@ def _upsert_service(api: client.CoreV1Api, desired: dict) -> None:
         api.patch_namespaced_service(name=name, namespace=namespace, body=desired)
 
 
+def _delete_deployment(api: client.AppsV1Api, *, name: str, namespace: str) -> None:
+    try:
+        api.delete_namespaced_deployment(name=name, namespace=namespace)
+    except ApiException as error:
+        if error.status != 404:
+            raise
+
+
 def reconcile(
     resource: dict,
     apps_api: client.AppsV1Api,
@@ -53,16 +66,25 @@ def reconcile(
     name = metadata["name"]
 
     _upsert_deployment(apps_api, build_deployment(resource))
+    canary_deployment = build_canary_deployment(resource)
+    if canary_deployment:
+        _upsert_deployment(apps_api, canary_deployment)
+    else:
+        _delete_deployment(
+            apps_api,
+            name=f"{name}-canary",
+            namespace=namespace,
+        )
     _upsert_service(core_api, build_service(resource))
-    desired_status = build_status(resource)
-    if resource.get("status") != desired_status:
+    status_patch = build_status_patch(resource)
+    if status_patch is not None:
         custom_api.patch_namespaced_custom_object_status(
             group=GROUP,
             version=VERSION,
             namespace=namespace,
             plural=PLURAL,
             name=name,
-            body={"status": desired_status},
+            body={"status": status_patch},
         )
     LOGGER.info("Reconciled AIWorkload %s/%s", namespace, name)
 

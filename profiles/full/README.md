@@ -17,3 +17,7 @@ den kjente demo-tokenen er flyktige og må aldri brukes i produksjon.
 CR-en beskriver modell, runtime, image og replikaer; operatoren oppretter og
 vedlikeholder backend Deployment og Service. Ollama er standard, mens `vllm`
 kan velges for en eksisterende OpenAI-kompatibel vLLM-server.
+
+Et valgfritt `spec.canary` oppretter en separat canary-Deployment som deler
+Service med stabilversjonen. Replica-forholdet gir en enkel, omtrentlig
+trafikkfordeling uten å installere service mesh i lokalclusteret.

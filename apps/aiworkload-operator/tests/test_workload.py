@@ -1,4 +1,10 @@
-from operator_app.workload import build_deployment, build_service, build_status
+from operator_app.workload import (
+    build_canary_deployment,
+    build_deployment,
+    build_service,
+    build_status,
+    build_status_patch,
+)
 
 
 def aiworkload() -> dict:
@@ -57,6 +63,9 @@ def test_service_selects_generated_deployment() -> None:
     assert service["spec"]["selector"].items() <= deployment["spec"]["template"][
         "metadata"
     ]["labels"].items()
+    assert service["spec"]["selector"] == {
+        "platform.kubelaunch.dev/aiworkload": "demo"
+    }
     assert service["spec"]["ports"] == [
         {"name": "http", "port": 8000, "targetPort": "http"}
     ]
@@ -102,3 +111,62 @@ def test_status_records_the_observed_generation() -> None:
         "model": "tinyllama",
         "runtime": "ollama",
     }
+
+
+def test_canary_deployment_shares_service_without_overlapping_selectors() -> None:
+    resource = aiworkload()
+    resource["spec"]["canary"] = {
+        "model": "qwen2:0.5b",
+        "replicas": 1,
+    }
+    stable = build_deployment(resource)
+    canary = build_canary_deployment(resource)
+    service = build_service(resource)
+
+    assert canary is not None
+    assert canary["metadata"]["name"] == "demo-canary"
+    assert stable["spec"]["selector"] != canary["spec"]["selector"]
+    for deployment in (stable, canary):
+        pod_labels = deployment["spec"]["template"]["metadata"]["labels"]
+        assert service["spec"]["selector"].items() <= pod_labels.items()
+
+    container = canary["spec"]["template"]["spec"]["containers"][0]
+    environment = {item["name"]: item["value"] for item in container["env"]}
+    assert container["image"] == "example/backend:v1"
+    assert environment["AI_MODEL"] == "qwen2:0.5b"
+    assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_RUNTIME_BASE_URL"] == "http://ollama.example:11434"
+
+
+def test_canary_status_reports_replica_based_traffic_share() -> None:
+    resource = aiworkload()
+    resource["spec"]["canary"] = {
+        "model": "qwen2:0.5b",
+        "runtime": "vllm",
+        "replicas": 1,
+    }
+
+    status = build_status(resource)
+
+    assert status["phase"] == "Canary"
+    assert status["canaryDeploymentName"] == "demo-canary"
+    assert status["canaryModel"] == "qwen2:0.5b"
+    assert status["canaryRuntime"] == "vllm"
+    assert status["estimatedCanaryTrafficPercent"] == 33
+
+
+def test_status_patch_clears_removed_canary_fields() -> None:
+    resource = aiworkload()
+    resource["status"] = build_status(resource) | {
+        "canaryDeploymentName": "demo-canary",
+        "canaryModel": "old-model",
+        "estimatedCanaryTrafficPercent": 33,
+    }
+
+    patch = build_status_patch(resource)
+
+    assert patch is not None
+    assert patch["phase"] == "Reconciled"
+    assert patch["canaryDeploymentName"] is None
+    assert patch["canaryModel"] is None
+    assert patch["estimatedCanaryTrafficPercent"] is None

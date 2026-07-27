@@ -24,5 +24,6 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 
 Etter MVP-en er `--full`-modus, cert-manager og en lokal External Secrets/Vault-
 demo og en `AIWorkload`-operator lagt til. Operator-workloads kan nå bruke både
-Ollama og et OpenAI-kompatibelt vLLM-endepunkt. Prosjektet kan videre utvides
-med canary-utrulling og guider for kjøring i skyen.
+Ollama og et OpenAI-kompatibelt vLLM-endepunkt, samt kjøre replica-basert canary
+med en separat Deployment. Prosjektet kan videre utvides med automatisert
+canary-analyse og guider for kjøring i skyen.

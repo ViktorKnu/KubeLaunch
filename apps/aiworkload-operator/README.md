@@ -27,6 +27,20 @@ spec:
 Genererte ressurser har owner reference til `AIWorkload` og blir derfor ryddet
 opp av Kubernetes når CR-en slettes.
 
+## Canary
+
+`spec.canary` oppretter en separat `<navn>-canary` Deployment. Den kan velge en
+annen modell, runtime, runtime-URL, image og replica-verdi. Stabil og canary har
+ikke-overlappende Deployment-selectors, men deler en egen traffic-group-label
+som Service velger. Trafikkandelen er derfor omtrent
+`canary replicas / totale replicas`.
+Modellen må allerede være tilgjengelig i runtime; operatoren administrerer
+backend-utrullingen, men laster ikke modeller automatisk.
+
+Se [examples/canary.yaml](examples/canary.yaml). Promoter en canary ved å kopiere
+verdiene til hovedfeltene og fjerne `spec.canary`. Operatoren sletter da canary-
+Deploymenten og rydder canary-feltene fra status.
+
 Eksempelet [examples/vllm.yaml](examples/vllm.yaml) viser kobling mot en vLLM-
 server. KubeLaunch installerer ikke vLLM automatisk, siden praktisk lokal
 kjøring normalt krever et vesentlig tyngre modell- og maskinvareoppsett enn

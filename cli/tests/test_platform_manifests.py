@@ -340,6 +340,14 @@ def test_aiworkload_crd_has_status_and_defaults() -> None:
         "default": "ollama",
     }
     assert "default" not in spec_schema["properties"]["runtimeURL"]
+    canary_schema = spec_schema["properties"]["canary"]
+    assert canary_schema["required"] == ["model"]
+    assert canary_schema["properties"]["replicas"] == {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5,
+        "default": 1,
+    }
     assert spec_schema["properties"]["replicas"]["default"] == 1
     assert spec_schema["properties"]["replicas"]["maximum"] == 5
 

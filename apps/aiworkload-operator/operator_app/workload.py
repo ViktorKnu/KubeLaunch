@@ -30,6 +30,17 @@ def _labels(name: str) -> dict[str, str]:
         "app.kubernetes.io/part-of": "kubelaunch",
         "app.kubernetes.io/managed-by": "aiworkload-operator",
         "platform.kubelaunch.dev/aiworkload": name,
+        "platform.kubelaunch.dev/traffic-group": name,
+    }
+
+
+def _canary_labels(name: str) -> dict[str, str]:
+    return {
+        "app.kubernetes.io/name": f"{name}-canary",
+        "app.kubernetes.io/part-of": "kubelaunch",
+        "app.kubernetes.io/managed-by": "aiworkload-operator",
+        "platform.kubelaunch.dev/aiworkload-canary": name,
+        "platform.kubelaunch.dev/traffic-group": name,
     }
 
 
@@ -37,7 +48,7 @@ def build_status(resource: dict) -> dict:
     """Build the observed status without changing the source resource."""
     metadata = resource["metadata"]
     name = metadata["name"]
-    return {
+    status = {
         "phase": "Reconciled",
         "observedGeneration": metadata.get("generation", 0),
         "deploymentName": name,
@@ -45,16 +56,52 @@ def build_status(resource: dict) -> dict:
         "model": resource["spec"]["model"],
         "runtime": resource["spec"].get("runtime", DEFAULT_RUNTIME),
     }
+    canary = resource["spec"].get("canary")
+    if canary:
+        stable_replicas = resource["spec"].get("replicas", 1)
+        canary_replicas = canary.get("replicas", 1)
+        status.update(
+            {
+                "phase": "Canary",
+                "canaryDeploymentName": f"{name}-canary",
+                "canaryModel": canary["model"],
+                "canaryRuntime": canary.get(
+                    "runtime", resource["spec"].get("runtime", DEFAULT_RUNTIME)
+                ),
+                "estimatedCanaryTrafficPercent": round(
+                    canary_replicas
+                    / (stable_replicas + canary_replicas)
+                    * 100
+                ),
+            }
+        )
+    return status
 
 
-def build_deployment(resource: dict) -> dict:
-    """Build the desired backend Deployment for an AIWorkload resource."""
+def build_status_patch(resource: dict) -> dict | None:
+    """Build an idempotent status patch and clear fields from an old canary."""
+    desired_status = build_status(resource)
+    current_status = resource.get("status", {})
+    if current_status == desired_status:
+        return None
+    return desired_status | {
+        key: None for key in current_status.keys() - desired_status.keys()
+    }
+
+
+def _build_backend_deployment(
+    resource: dict,
+    *,
+    name: str,
+    labels: dict[str, str],
+    selector: dict[str, str],
+    replicas: int,
+    image: str,
+    runtime: str,
+    runtime_url: str,
+    model: str,
+) -> dict:
     metadata = resource["metadata"]
-    spec = resource["spec"]
-    name = metadata["name"]
-    labels = _labels(name)
-    runtime = spec.get("runtime", DEFAULT_RUNTIME)
-    runtime_url = spec.get("runtimeURL", DEFAULT_RUNTIME_URLS[runtime])
 
     return {
         "apiVersion": "apps/v1",
@@ -66,10 +113,8 @@ def build_deployment(resource: dict) -> dict:
             "ownerReferences": _owner_reference(resource),
         },
         "spec": {
-            "replicas": spec.get("replicas", 1),
-            "selector": {
-                "matchLabels": {"platform.kubelaunch.dev/aiworkload": name}
-            },
+            "replicas": replicas,
+            "selector": {"matchLabels": selector},
             "template": {
                 "metadata": {"labels": labels},
                 "spec": {
@@ -77,7 +122,7 @@ def build_deployment(resource: dict) -> dict:
                     "containers": [
                         {
                             "name": "backend",
-                            "image": spec.get("image", DEFAULT_IMAGE),
+                            "image": image,
                             "imagePullPolicy": "IfNotPresent",
                             "env": [
                                 {
@@ -88,7 +133,7 @@ def build_deployment(resource: dict) -> dict:
                                     "name": "AI_RUNTIME_BASE_URL",
                                     "value": runtime_url,
                                 },
-                                {"name": "AI_MODEL", "value": spec["model"]},
+                                {"name": "AI_MODEL", "value": model},
                                 {
                                     "name": "AI_TIMEOUT_SECONDS",
                                     "value": "120",
@@ -124,10 +169,64 @@ def build_deployment(resource: dict) -> dict:
     }
 
 
+def build_deployment(resource: dict) -> dict:
+    """Build the desired stable backend Deployment for an AIWorkload."""
+    metadata = resource["metadata"]
+    spec = resource["spec"]
+    name = metadata["name"]
+    runtime = spec.get("runtime", DEFAULT_RUNTIME)
+    return _build_backend_deployment(
+        resource,
+        name=name,
+        labels=_labels(name),
+        selector={"platform.kubelaunch.dev/aiworkload": name},
+        replicas=spec.get("replicas", 1),
+        image=spec.get("image", DEFAULT_IMAGE),
+        runtime=runtime,
+        runtime_url=spec.get("runtimeURL", DEFAULT_RUNTIME_URLS[runtime]),
+        model=spec["model"],
+    )
+
+
+def build_canary_deployment(resource: dict) -> dict | None:
+    """Build the optional canary Deployment with a non-overlapping selector."""
+    metadata = resource["metadata"]
+    spec = resource["spec"]
+    canary = spec.get("canary")
+    if not canary:
+        return None
+
+    name = metadata["name"]
+    stable_runtime = spec.get("runtime", DEFAULT_RUNTIME)
+    runtime = canary.get("runtime", stable_runtime)
+    runtime_url = canary.get("runtimeURL")
+    if runtime_url is None and runtime == stable_runtime:
+        runtime_url = spec.get("runtimeURL")
+    if runtime_url is None:
+        runtime_url = DEFAULT_RUNTIME_URLS[runtime]
+
+    return _build_backend_deployment(
+        resource,
+        name=f"{name}-canary",
+        labels=_canary_labels(name),
+        selector={"platform.kubelaunch.dev/aiworkload-canary": name},
+        replicas=canary.get("replicas", 1),
+        image=canary.get("image", spec.get("image", DEFAULT_IMAGE)),
+        runtime=runtime,
+        runtime_url=runtime_url,
+        model=canary["model"],
+    )
+
+
 def build_service(resource: dict) -> dict:
     """Build the stable Service for an AIWorkload backend."""
     metadata = resource["metadata"]
     name = metadata["name"]
+    selector_label = (
+        "platform.kubelaunch.dev/traffic-group"
+        if resource["spec"].get("canary")
+        else "platform.kubelaunch.dev/aiworkload"
+    )
 
     return {
         "apiVersion": "v1",
@@ -139,7 +238,7 @@ def build_service(resource: dict) -> dict:
             "ownerReferences": _owner_reference(resource),
         },
         "spec": {
-            "selector": {"platform.kubelaunch.dev/aiworkload": name},
+            "selector": {selector_label: name},
             "ports": [{"name": "http", "port": 8000, "targetPort": "http"}],
         },
     }

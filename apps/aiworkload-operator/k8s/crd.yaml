@@ -26,6 +26,12 @@ spec:
         - name: Runtime
           type: string
           jsonPath: .spec.runtime
+        - name: Canary
+          type: string
+          jsonPath: .spec.canary.model
+        - name: Canary%
+          type: integer
+          jsonPath: .status.estimatedCanaryTrafficPercent
         - name: Replicas
           type: integer
           jsonPath: .spec.replicas
@@ -66,6 +72,30 @@ spec:
                   minimum: 1
                   maximum: 5
                   default: 1
+                canary:
+                  type: object
+                  required:
+                    - model
+                  properties:
+                    model:
+                      type: string
+                      minLength: 1
+                    runtime:
+                      type: string
+                      enum:
+                        - ollama
+                        - vllm
+                    runtimeURL:
+                      type: string
+                      minLength: 1
+                    image:
+                      type: string
+                      minLength: 1
+                    replicas:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                      default: 1
             status:
               type: object
               properties:
@@ -82,3 +112,11 @@ spec:
                   type: string
                 runtime:
                   type: string
+                canaryDeploymentName:
+                  type: string
+                canaryModel:
+                  type: string
+                canaryRuntime:
+                  type: string
+                estimatedCanaryTrafficPercent:
+                  type: integer

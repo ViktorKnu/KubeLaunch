@@ -38,7 +38,6 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 ## Dette venter til senere
 
 - automatisk TLS for frontenden med en offentlig issuer
-- canary-utrulling av modeller
 - automatisk oppsett i skyen
 
 Se [videre plan](docs/README.md#videre-plan) for rekkefølgen på milepælene.
@@ -205,6 +204,29 @@ spec:
 
 Selve vLLM-serveren installeres ikke av KubeLaunch. Dermed forblir den lokale
 CPU-demoen lett, mens samme backend-API kan brukes mot en separat vLLM-runtime.
+
+### Canary-utrulling
+
+En `AIWorkload` kan kjøre en ny modell eller runtime ved siden av den stabile
+Deploymenten. Begge variantene ligger bak samme Service, og Kubernetes fordeler
+tilkoblinger mellom poddene. Dette gir en enkel, replica-basert canary uten
+service mesh:
+
+```yaml
+spec:
+  model: tinyllama
+  replicas: 3
+  canary:
+    model: qwen2:0.5b
+    replicas: 1
+```
+
+Eksempelet gir omtrent 25 prosent canary-trafikk. Den faktiske fordelingen kan
+variere på grunn av vedvarende forbindelser og Kubernetes sin lastbalansering.
+Canary-modellen må være lastet i valgt runtime før trafikk sendes til den.
+Følg utrullingen med `make aiworkload-status`. Promoter ved å flytte canary-
+verdiene til hovedfeltene og fjerne `spec.canary`; operatoren fjerner da canary-
+Deploymenten.
 
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten
