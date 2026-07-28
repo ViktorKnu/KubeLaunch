@@ -9,11 +9,30 @@ def load_yaml(relative_path: str) -> dict:
     return yaml.safe_load((REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8"))
 
 
-def test_root_application_recursively_loads_platform() -> None:
+def test_root_application_loads_platform_kustomization() -> None:
     root = load_yaml("platform/root-application.yaml")
 
-    assert root["spec"]["source"]["path"] == "platform"
-    assert root["spec"]["source"]["directory"]["recurse"] is True
+    assert root["spec"]["source"]["path"] == "platform/components"
+    assert "directory" not in root["spec"]["source"]
+
+
+def test_git_applications_are_patchable_by_cloud_bootstrap() -> None:
+    git_applications = (
+        "platform/components/smoke-test-application.yaml",
+        "platform/components/keda-smoke-test-application.yaml",
+        "platform/components/ollama-application.yaml",
+        "platform/components/ai-demo-backend-application.yaml",
+        "platform/components/ai-demo-frontend-application.yaml",
+        "profiles/full/components/cert-manager-smoke-test-application.yaml",
+        "profiles/full/components/vault-bootstrap-application.yaml",
+        "profiles/full/components/external-secrets-smoke-test-application.yaml",
+        "profiles/full/components/aiworkload-operator-application.yaml",
+        "profiles/full/components/aiworkload-smoke-test-application.yaml",
+    )
+
+    for path in git_applications:
+        application = load_yaml(path)
+        assert application["metadata"]["labels"]["kubelaunch.dev/source"] == "git"
 
 
 def test_smoke_test_application_uses_kustomize_directory() -> None:
@@ -394,6 +413,15 @@ def test_kustomization_references_existing_resources() -> None:
 
         for resource in kustomization["resources"]:
             assert (app_directory / resource).is_file()
+
+    for relative_directory in (
+        "platform/components",
+        "profiles/full/components",
+    ):
+        directory = REPOSITORY_ROOT / relative_directory
+        kustomization = load_yaml(f"{relative_directory}/kustomization.yaml")
+        for resource in kustomization["resources"]:
+            assert (directory / resource).is_file()
 
 
 def test_service_selector_matches_deployment() -> None:

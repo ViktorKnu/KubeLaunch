@@ -96,6 +96,8 @@ lint:
 
 validate:
 	python scripts/validate_manifests.py
+	kubectl kustomize platform/components
+	kubectl kustomize profiles/full/components
 	kubectl kustomize apps/platform-smoke-test
 	kubectl kustomize apps/keda-smoke-test
 	kubectl kustomize apps/ollama

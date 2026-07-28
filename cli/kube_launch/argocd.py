@@ -13,6 +13,7 @@ ARGOCD_CHART = "argo-cd"
 ARGOCD_CHART_REPOSITORY = "https://argoproj.github.io/argo-helm"
 ARGOCD_CHART_VERSION = "9.5.17"
 ROOT_APPLICATION_NAME = "kubelaunch"
+DEFAULT_REPOSITORY_URL = "https://github.com/ViktorKnu/KubeLaunch.git"
 ROOT_APPLICATION_PATHS = {
     "minimal": Path("platform") / "root-application.yaml",
     "full": Path("profiles") / "full" / "root-application.yaml",
@@ -51,13 +52,14 @@ class ApplicationStatus:
     health_status: str = "Unknown"
 
 
-def _run(command: list[str]) -> CommandResult:
+def _run(command: list[str], *, input_text: str | None = None) -> CommandResult:
     try:
         completed = subprocess.run(
             command,
             capture_output=True,
             check=False,
             text=True,
+            input=input_text,
         )
     except OSError as error:
         raise ArgoCDCommandError(f"Could not run {command[0]}: {error}") from error
@@ -74,7 +76,7 @@ def _raise_command_error(action: str, result: CommandResult) -> None:
     raise ArgoCDCommandError(f"Could not {action}: {details}")
 
 
-def install_argocd() -> None:
+def install_argocd(context: str = KUBE_CONTEXT) -> None:
     """Install or update Argo CD and wait for the Helm release to be ready."""
     result = _run(
         [
@@ -91,7 +93,7 @@ def install_argocd() -> None:
             ARGOCD_NAMESPACE,
             "--create-namespace",
             "--kube-context",
-            KUBE_CONTEXT,
+            context,
             "--wait",
             "--timeout",
             "5m",
@@ -122,21 +124,192 @@ def find_root_application(profile: str = "minimal") -> Path:
     )
 
 
+def _git_source_patch(repository_url: str, revision: str) -> str:
+    return "\n".join(
+        (
+            "- op: replace",
+            "  path: /spec/source/repoURL",
+            f"  value: {json.dumps(repository_url)}",
+            "- op: replace",
+            "  path: /spec/source/targetRevision",
+            f"  value: {json.dumps(revision)}",
+        )
+    )
+
+
+def _application_kustomize_patch(name: str, configuration: dict) -> dict:
+    patch = "\n".join(
+        (
+            "- op: add",
+            "  path: /spec/source/kustomize",
+            f"  value: {json.dumps(configuration)}",
+        )
+    )
+    return {
+        "target": {"kind": "Application", "name": name},
+        "patch": patch,
+    }
+
+
+def _image_override(source_image: str, target_image: str) -> dict:
+    return {"images": [f"{source_image}={target_image}"]}
+
+
+def _aiworkload_image_override(target_image: str) -> dict:
+    patch = "\n".join(
+        (
+            "- op: replace",
+            "  path: /spec/image",
+            f"  value: {json.dumps(target_image)}",
+        )
+    )
+    return {
+        "patches": [
+            {
+                "target": {"kind": "AIWorkload"},
+                "patch": patch,
+            }
+        ]
+    }
+
+
+def build_root_application(
+    profile: str,
+    repository_url: str,
+    revision: str,
+    backend_image: str,
+    frontend_image: str,
+    operator_image: str | None = None,
+) -> dict:
+    """Build a root Application that propagates its Git source to child apps."""
+    if profile not in ROOT_APPLICATION_PATHS:
+        raise ArgoCDCommandError(f"Unknown platform profile: {profile}")
+
+    repository_patch = {
+        "target": {
+            "kind": "Application",
+            "labelSelector": "kubelaunch.dev/source=git",
+        },
+        "patch": _git_source_patch(repository_url, revision),
+    }
+    platform_patches = [
+        repository_patch,
+        _application_kustomize_patch(
+            "ai-demo-backend",
+            _image_override("kubelaunch-backend:dev", backend_image),
+        ),
+        _application_kustomize_patch(
+            "ai-demo-frontend",
+            _image_override("kubelaunch-frontend:dev", frontend_image),
+        ),
+    ]
+    sources = [
+        {
+            "repoURL": repository_url,
+            "targetRevision": revision,
+            "path": "platform/components",
+            "kustomize": {"patches": platform_patches},
+        }
+    ]
+    if profile == "full":
+        if not operator_image:
+            raise ArgoCDCommandError("The full profile requires an operator image")
+        sources.append(
+            {
+                "repoURL": repository_url,
+                "targetRevision": revision,
+                "path": "profiles/full/components",
+                "kustomize": {
+                    "patches": [
+                        repository_patch,
+                        _application_kustomize_patch(
+                            "aiworkload-operator",
+                            _image_override(
+                                "kubelaunch-aiworkload-operator:dev",
+                                operator_image,
+                            ),
+                        ),
+                        _application_kustomize_patch(
+                            "aiworkload-smoke-test",
+                            _aiworkload_image_override(backend_image),
+                        ),
+                    ]
+                },
+            }
+        )
+    source_spec = (
+        {"source": sources[0]}
+        if profile == "minimal"
+        else {"sources": sources}
+    )
+
+    return {
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "Application",
+        "metadata": {
+            "name": ROOT_APPLICATION_NAME,
+            "namespace": ARGOCD_NAMESPACE,
+            "annotations": {"kubelaunch.dev/profile": profile},
+            "finalizers": ["resources-finalizer.argocd.argoproj.io"],
+        },
+        "spec": {
+            "project": "default",
+            **source_spec,
+            "destination": {
+                "server": "https://kubernetes.default.svc",
+                "namespace": ARGOCD_NAMESPACE,
+            },
+            "syncPolicy": {
+                "automated": {"prune": True, "selfHeal": True},
+            },
+        },
+    }
+
+
 def apply_root_application(
     manifest: Path | None = None,
     profile: str = "minimal",
+    context: str = KUBE_CONTEXT,
+    repository_url: str | None = None,
+    revision: str = "main",
+    backend_image: str | None = None,
+    frontend_image: str | None = None,
+    operator_image: str | None = None,
 ) -> None:
     """Apply the single root Application after the Argo CD CRD is ready."""
-    manifest = manifest or find_root_application(profile)
+    if manifest is not None and repository_url is not None:
+        raise ArgoCDCommandError("Manifest and repository override cannot be combined")
+
+    input_text = None
+    if repository_url is None:
+        manifest = manifest or find_root_application(profile)
+        filename = str(manifest)
+    else:
+        if not backend_image or not frontend_image:
+            raise ArgoCDCommandError(
+                "Repository overrides require backend and frontend images"
+            )
+        filename = "-"
+        input_text = json.dumps(
+            build_root_application(
+                profile,
+                repository_url,
+                revision,
+                backend_image,
+                frontend_image,
+                operator_image,
+            )
+        )
     result = _run(
         [
             "kubectl",
             "--context",
-            KUBE_CONTEXT,
+            context,
             "apply",
             "--filename",
-            str(manifest),
-        ]
+            filename,
+        ],
+        input_text=input_text,
     )
     if result.returncode != 0:
         _raise_command_error("apply the root Argo CD Application", result)

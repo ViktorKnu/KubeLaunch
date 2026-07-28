@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - smoke-test-application.yaml
+  - observability-application.yaml
+  - keda-application.yaml
+  - keda-smoke-test-application.yaml
+  - ollama-application.yaml
+  - ai-demo-backend-application.yaml
+  - ai-demo-frontend-application.yaml

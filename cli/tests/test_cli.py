@@ -51,8 +51,112 @@ def test_help_lists_commands() -> None:
 
     assert result.exit_code == 0
     assert "up" in result.stdout
+    assert "bootstrap" in result.stdout
     assert "status" in result.stdout
     assert "down" in result.stdout
+
+
+def test_bootstrap_existing_cluster_with_repository_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        "kube_launch.prerequisites.which",
+        lambda name: None if name == "k3d" else str(Path("tools") / name),
+    )
+    monkeypatch.setattr(
+        "kube_launch.main.cluster_reachable",
+        lambda context: calls.append(("reachable", context)) or True,
+    )
+    monkeypatch.setattr(
+        "kube_launch.main.install_argocd",
+        lambda context: calls.append(("install", context)),
+    )
+    monkeypatch.setattr(
+        "kube_launch.main.apply_root_application",
+        lambda **kwargs: calls.append(("apply", kwargs)),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "bootstrap",
+            "--context",
+            "aks-team",
+            "--profile",
+            "full",
+            "--repo-url",
+            "https://github.com/example/fork.git",
+            "--revision",
+            "release-1",
+            "--backend-image",
+            "registry.example/backend:release-1",
+            "--frontend-image",
+            "registry.example/frontend:release-1",
+            "--operator-image",
+            "registry.example/operator:release-1",
+            "--yes",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls == [
+        ("reachable", "aks-team"),
+        ("install", "aks-team"),
+        (
+            "apply",
+            {
+                "profile": "full",
+                "context": "aks-team",
+                "repository_url": "https://github.com/example/fork.git",
+                "revision": "release-1",
+                "backend_image": "registry.example/backend:release-1",
+                "frontend_image": "registry.example/frontend:release-1",
+                "operator_image": "registry.example/operator:release-1",
+            },
+        ),
+    ]
+    assert "Root Argo CD Application applied (full, release-1)." in result.stdout
+
+
+def test_bootstrap_rejects_unknown_profile() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "bootstrap",
+            "--context",
+            "aks-team",
+            "--profile",
+            "production",
+            "--backend-image",
+            "registry.example/backend:v1",
+            "--frontend-image",
+            "registry.example/frontend:v1",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--profile minimal or full" in result.output
+
+
+def test_full_bootstrap_requires_operator_image() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "bootstrap",
+            "--context",
+            "aks-team",
+            "--profile",
+            "full",
+            "--backend-image",
+            "registry.example/backend:v1",
+            "--frontend-image",
+            "registry.example/frontend:v1",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "requires --operator-image" in result.output
 
 
 def test_up_requires_exactly_one_profile() -> None:

@@ -25,5 +25,7 @@ Prosjektet bygges i små deler som kan testes og committes hver for seg:
 Etter MVP-en er `--full`-modus, cert-manager og en lokal External Secrets/Vault-
 demo og en `AIWorkload`-operator lagt til. Operator-workloads kan nå bruke både
 Ollama og et OpenAI-kompatibelt vLLM-endepunkt, samt kjøre replica-basert canary
-med en separat Deployment. Prosjektet kan videre utvides med automatisert
-canary-analyse og guider for kjøring i skyen.
+med en separat Deployment. Et eksisterende Kubernetes-cluster kan nå bootstrappes
+med eksplisitt context, Git-kilde og registry-images; se
+[sky-cluster-guiden](cloud.md). Prosjektet kan videre utvides med automatisert
+canary-analyse og leverandørspesifikk infrastrukturkode.

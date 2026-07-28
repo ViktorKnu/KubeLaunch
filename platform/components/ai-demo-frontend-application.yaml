@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: ai-demo-frontend
   namespace: argocd
+  labels:
+    kubelaunch.dev/source: git
   annotations:
     argocd.argoproj.io/sync-wave: "3"
   finalizers:
@@ -28,4 +30,3 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 1m
-

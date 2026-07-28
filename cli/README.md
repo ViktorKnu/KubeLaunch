@@ -1,7 +1,7 @@
 # CLI
 
-`kube-launch` er skrevet i Python med Typer. CLI-et skal håndtere livsløpet til
-det lokale clusteret, bootstrap av Argo CD og en samlet status for plattformen.
+`kube-launch` er skrevet i Python med Typer. CLI-et håndterer livsløpet til det
+lokale clusteret, bootstrap av Argo CD og en samlet status for plattformen.
 Det skal ikke installere hver enkelt plattformkomponent direkte.
 
 ## Lokal utvikling
@@ -23,6 +23,16 @@ kube-launch status
 kube-launch down
 ```
 
+Et eksisterende Kubernetes-cluster kan bootstrappes uten k3d. Context må oppgis
+eksplisitt, og lokale images må erstattes med pullbare registry-images:
+
+```console
+kube-launch bootstrap --help
+```
+
+Kommandoen endrer ikke aktivt kube-context og oppretter eller sletter ikke
+cluster-infrastruktur. Se [sky-cluster-guiden](../docs/cloud.md).
+
 `up --minimal` og `up --full` er idempotente og lar et eksisterende cluster være
 i fred. Minimalprofilen installerer MVP-plattformen. Fullprofilen bruker de samme
 komponentene og legger i tillegg til cert-manager med en selvsignert
@@ -39,8 +49,8 @@ opptil to minutter og prøver readiness-endepunktet flere ganger.
 
 Når clusteret er klart, installerer `up` Argo CD med Helm og venter til
 installasjonen er klar. Til slutt legges `platform/root-application.yaml` inn i
-clusteret. Root Application peker på `platform/` i dette repoet; alle andre
-komponenter skal etter hvert synkroniseres av Argo CD.
+clusteret. Root Application peker på `platform/components` i dette repoet; alle
+andre komponenter synkroniseres av Argo CD.
 
 `status` viser samlet sync og health for smoke-testene, observability, KEDA,
 Ollama, backend og frontend. Kommandoen viser også port-forward-kommandoer for

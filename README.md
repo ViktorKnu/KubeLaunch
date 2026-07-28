@@ -2,11 +2,13 @@
 
 [![CI](https://github.com/ViktorKnu/KubeLaunch/actions/workflows/ci.yml/badge.svg)](https://github.com/ViktorKnu/KubeLaunch/actions/workflows/ci.yml)
 
-KubeLaunch setter opp en lokal Kubernetes-plattform for en liten AI-demo. Målet
-er å vise hvordan k3d, Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
+KubeLaunch setter opp en GitOps-native Kubernetes-plattform for en liten AI-demo.
+Den kan bruke et lokalt k3d-cluster eller bootstrappe et eksisterende cluster.
+Målet er å vise hvordan Argo CD, Prometheus, Grafana, KEDA og Ollama kan fungere
 sammen, uten at prosjektet blir unødvendig stort.
 
-> **Status:** CLI-et kan opprette et lokalt k3d-cluster og installere Argo CD.
+> **Status:** CLI-et kan opprette lokalt k3d eller bruke et eksplisitt context.
+> Det installerer Argo CD og én root Application.
 > App-of-apps, observability, KEDA, Ollama, FastAPI-backenden og frontenden er
 > koblet opp. Backenden autoskaleres med KEDA basert på aktive prompts.
 
@@ -38,7 +40,8 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 ## Dette venter til senere
 
 - automatisk TLS for frontenden med en offentlig issuer
-- automatisk oppsett i skyen
+- leverandørspesifikk opprettelse av AKS, EKS eller GKE
+- produksjonsklar ingress, offentlig TLS og DNS
 
 Se [videre plan](docs/README.md#videre-plan) for rekkefølgen på milepælene.
 
@@ -86,6 +89,7 @@ Profilene er gjensidig eksklusive, og den aktive profilen vises av
 ```console
 kube-launch up --minimal
 kube-launch up --full     # utvidet profil med cert-manager
+kube-launch bootstrap --help  # eksisterende Kubernetes-cluster
 kube-launch status
 kube-launch down
 kube-launch down --yes  # hopper over bekreftelsen
@@ -124,6 +128,16 @@ løpende synkroniseringen av plattformen.
 
 Fullprofilen bruker `profiles/full/root-application.yaml`, som kombinerer de
 samme felleskomponentene med profilspesifikke Applications.
+
+## Eksisterende Kubernetes-cluster
+
+`bootstrap` installerer Argo CD og root Application i et eksplisitt kube-context
+uten å opprette eller slette selve clusteret. Kommandoen støtter egen Git-fork,
+immutable revision og pullbare registry-images, og propagerer disse gjennom
+app-of-apps-oppsettet.
+
+Se [guiden for eksisterende sky-cluster](docs/cloud.md) for bygging av images,
+full kommando, verifisering og produksjonsbegrensninger.
 
 ## Fullprofil og cert-manager
 

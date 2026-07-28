@@ -1,3 +1,4 @@
+import json
 import subprocess
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from kube_launch.argocd import (
     application_status,
     apply_root_application,
     argocd_status,
+    build_root_application,
     install_argocd,
     root_application_exists,
     root_application_profile,
@@ -35,13 +37,13 @@ def test_install_argocd_uses_pinned_chart_and_waits(
 
     monkeypatch.setattr("kube_launch.argocd.subprocess.run", fake_run)
 
-    install_argocd()
+    install_argocd(context="aks-team")
 
     command = commands[0]
     assert command[:5] == ["helm", "upgrade", "--install", "argocd", "argo-cd"]
     assert command[command.index("--version") + 1] == ARGOCD_CHART_VERSION
     assert "--wait" in command
-    assert command[command.index("--kube-context") + 1] == "k3d-kubelaunch"
+    assert command[command.index("--kube-context") + 1] == "aks-team"
 
 
 def test_apply_root_application_uses_cluster_context(
@@ -72,6 +74,70 @@ def test_apply_root_application_uses_cluster_context(
             str(manifest),
         ]
     ]
+
+
+def test_apply_root_application_renders_repository_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        captured["input"] = kwargs["input"]
+        return completed()
+
+    monkeypatch.setattr("kube_launch.argocd.subprocess.run", fake_run)
+
+    apply_root_application(
+        profile="minimal",
+        context="aks-team",
+        repository_url="https://github.com/example/fork.git",
+        revision="release-1",
+        backend_image="registry.example/backend:release-1",
+        frontend_image="registry.example/frontend:release-1",
+    )
+
+    assert captured["command"] == [
+        "kubectl",
+        "--context",
+        "aks-team",
+        "apply",
+        "--filename",
+        "-",
+    ]
+    application = json.loads(str(captured["input"]))
+    source = application["spec"]["source"]
+    assert source["repoURL"] == "https://github.com/example/fork.git"
+    assert source["targetRevision"] == "release-1"
+    assert source["path"] == "platform/components"
+    patch = source["kustomize"]["patches"][0]
+    assert patch["target"]["labelSelector"] == "kubelaunch.dev/source=git"
+    assert "https://github.com/example/fork.git" in patch["patch"]
+    assert "release-1" in patch["patch"]
+    image_patches = source["kustomize"]["patches"]
+    assert "registry.example/backend:release-1" in image_patches[1]["patch"]
+    assert "registry.example/frontend:release-1" in image_patches[2]["patch"]
+
+
+def test_full_root_builder_uses_both_component_directories() -> None:
+    application = build_root_application(
+        "full",
+        "https://github.com/example/fork.git",
+        "main",
+        "registry.example/backend:v1",
+        "registry.example/frontend:v1",
+        "registry.example/operator:v1",
+    )
+
+    assert [source["path"] for source in application["spec"]["sources"]] == [
+        "platform/components",
+        "profiles/full/components",
+    ]
+    full_patches = application["spec"]["sources"][1]["kustomize"]["patches"]
+    assert "registry.example/operator:v1" in full_patches[1]["patch"]
+    assert "registry.example/backend:v1" in full_patches[2]["patch"]
 
 
 def test_argocd_status_reads_ready_replicas(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,8 +242,7 @@ def test_root_application_points_to_platform_directory() -> None:
     assert manifest["spec"]["source"] == {
         "repoURL": "https://github.com/ViktorKnu/KubeLaunch.git",
         "targetRevision": "main",
-        "path": "platform",
-        "directory": {"recurse": True},
+        "path": "platform/components",
     }
 
 
@@ -192,5 +257,5 @@ def test_full_root_application_combines_common_and_full_components() -> None:
     assert manifest["metadata"]["annotations"]["kubelaunch.dev/profile"] == "full"
     assert [source["path"] for source in manifest["spec"]["sources"]] == [
         "platform/components",
-        "profiles/full",
+        "profiles/full/components",
     ]

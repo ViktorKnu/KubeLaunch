@@ -3,6 +3,7 @@
 import typer
 
 from kube_launch.argocd import (
+    DEFAULT_REPOSITORY_URL,
     ArgoCDCommandError,
     application_status,
     apply_root_application,
@@ -25,7 +26,7 @@ from kube_launch.prerequisites import REQUIRED_TOOLS, ToolStatus, check_tools
 
 app = typer.Typer(
     name="kube-launch",
-    help="Bootstrap and inspect a local GitOps-native Kubernetes platform.",
+    help="Bootstrap and inspect a GitOps-native Kubernetes platform.",
     no_args_is_help=True,
 )
 
@@ -193,6 +194,124 @@ def up(
     except ArgoCDCommandError as error:
         _print_argocd_error(error)
         raise typer.Exit(code=1) from error
+
+
+@app.command()
+def bootstrap(
+    context: str = typer.Option(
+        ...,
+        "--context",
+        help="Explicit kubeconfig context for an existing cluster.",
+    ),
+    profile: str = typer.Option(
+        "minimal",
+        "--profile",
+        help="Platform profile: minimal or full.",
+    ),
+    repository_url: str = typer.Option(
+        DEFAULT_REPOSITORY_URL,
+        "--repo-url",
+        help="Git repository Argo CD should continuously reconcile.",
+    ),
+    revision: str = typer.Option(
+        "main",
+        "--revision",
+        help="Git branch, tag, or commit to reconcile.",
+    ),
+    backend_image: str = typer.Option(
+        ...,
+        "--backend-image",
+        help="Pullable backend image, including registry and immutable tag.",
+    ),
+    frontend_image: str = typer.Option(
+        ...,
+        "--frontend-image",
+        help="Pullable frontend image, including registry and immutable tag.",
+    ),
+    operator_image: str | None = typer.Option(
+        None,
+        "--operator-image",
+        help="Pullable AIWorkload operator image required by the full profile.",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Bootstrap without asking for confirmation.",
+    ),
+) -> None:
+    """Bootstrap KubeLaunch into an existing Kubernetes cluster."""
+    context = context.strip()
+    profile = profile.strip().lower()
+    repository_url = repository_url.strip()
+    revision = revision.strip()
+    backend_image = backend_image.strip()
+    frontend_image = frontend_image.strip()
+    operator_image = operator_image.strip() if operator_image else None
+    if not context or profile not in {"minimal", "full"}:
+        typer.secho(
+            "Provide a context and choose --profile minimal or full.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    if not repository_url or not revision or not backend_image or not frontend_image:
+        typer.secho(
+            "Repository, revision, backend image, and frontend image are required.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    if profile == "full" and not operator_image:
+        typer.secho(
+            "The full profile requires --operator-image.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    typer.secho("KubeLaunch existing-cluster bootstrap", bold=True)
+    if not _check_prerequisites(("kubectl", "helm")):
+        typer.echo("Install the missing tools and run this command again.", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        if not cluster_reachable(context=context):
+            typer.secho(
+                f"Kubernetes context '{context}' is not reachable.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        if not yes:
+            typer.confirm(
+                f"Install Argo CD and KubeLaunch ({profile}) into '{context}'?",
+                abort=True,
+            )
+
+        typer.echo(f"Installing or updating Argo CD in '{context}'...")
+        install_argocd(context=context)
+        apply_root_application(
+            profile=profile,
+            context=context,
+            repository_url=repository_url,
+            revision=revision,
+            backend_image=backend_image,
+            frontend_image=frontend_image,
+            operator_image=operator_image,
+        )
+    except ClusterCommandError as error:
+        _print_cluster_error(error)
+        raise typer.Exit(code=1) from error
+    except ArgoCDCommandError as error:
+        _print_argocd_error(error)
+        raise typer.Exit(code=1) from error
+
+    typer.secho(
+        f"Root Argo CD Application applied ({profile}, {revision}).",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.command()
