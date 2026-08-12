@@ -233,6 +233,21 @@ def bootstrap(
         "--operator-image",
         help="Pullable AIWorkload operator image required by the full profile.",
     ),
+    ingress_hostname: str | None = typer.Option(
+        None,
+        "--ingress-hostname",
+        help="Public DNS hostname for the optional TLS frontend ingress.",
+    ),
+    ingress_class: str | None = typer.Option(
+        None,
+        "--ingress-class",
+        help="Existing IngressClass used for the frontend ingress.",
+    ),
+    cluster_issuer: str | None = typer.Option(
+        None,
+        "--cluster-issuer",
+        help="Existing cert-manager ClusterIssuer used for the TLS certificate.",
+    ),
     yes: bool = typer.Option(
         False,
         "--yes",
@@ -248,6 +263,9 @@ def bootstrap(
     backend_image = backend_image.strip()
     frontend_image = frontend_image.strip()
     operator_image = operator_image.strip() if operator_image else None
+    ingress_hostname = ingress_hostname.strip().lower() if ingress_hostname else None
+    ingress_class = ingress_class.strip() if ingress_class else None
+    cluster_issuer = cluster_issuer.strip() if cluster_issuer else None
     if not context or profile not in {"minimal", "full"}:
         typer.secho(
             "Provide a context and choose --profile minimal or full.",
@@ -265,6 +283,27 @@ def bootstrap(
     if profile == "full" and not operator_image:
         typer.secho(
             "The full profile requires --operator-image.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    ingress_options = (ingress_hostname, ingress_class, cluster_issuer)
+    if any(ingress_options) and not all(ingress_options):
+        typer.secho(
+            "Ingress requires --ingress-hostname, --ingress-class, and "
+            "--cluster-issuer together.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    if ingress_hostname and (
+        "." not in ingress_hostname
+        or ingress_hostname.startswith(".")
+        or ingress_hostname.endswith(".")
+        or " " in ingress_hostname
+    ):
+        typer.secho(
+            "Ingress hostname must be a valid DNS name.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -300,6 +339,9 @@ def bootstrap(
             backend_image=backend_image,
             frontend_image=frontend_image,
             operator_image=operator_image,
+            ingress_hostname=ingress_hostname,
+            ingress_class=ingress_class,
+            cluster_issuer=cluster_issuer,
         )
     except ClusterCommandError as error:
         _print_cluster_error(error)
@@ -312,6 +354,8 @@ def bootstrap(
         f"Root Argo CD Application applied ({profile}, {revision}).",
         fg=typer.colors.GREEN,
     )
+    if ingress_hostname:
+        typer.echo(f"Frontend URL: https://{ingress_hostname}")
 
 
 @app.command()

@@ -39,9 +39,8 @@ at modellen slipper å starte på nytt hver gang trafikken endrer seg.
 
 ## Dette venter til senere
 
-- automatisk TLS for frontenden med en offentlig issuer
 - leverandørspesifikk opprettelse av AKS, EKS eller GKE
-- produksjonsklar ingress, offentlig TLS og DNS
+- automatisk opprettelse av ingress-controller, offentlig issuer og DNS
 
 Se [videre plan](docs/README.md#videre-plan) for rekkefølgen på milepælene.
 
@@ -137,7 +136,7 @@ immutable revision og pullbare registry-images, og propagerer disse gjennom
 app-of-apps-oppsettet.
 
 Se [guiden for eksisterende sky-cluster](docs/cloud.md) for bygging av images,
-full kommando, verifisering og produksjonsbegrensninger.
+full kommando, valgfri HTTPS-ingress, verifisering og produksjonsbegrensninger.
 
 ## Fullprofil og cert-manager
 

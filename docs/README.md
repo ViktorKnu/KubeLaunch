@@ -28,4 +28,4 @@ Ollama og et OpenAI-kompatibelt vLLM-endepunkt, samt kjøre replica-basert canar
 med en separat Deployment. Et eksisterende Kubernetes-cluster kan nå bootstrappes
 med eksplisitt context, Git-kilde og registry-images; se
 [sky-cluster-guiden](cloud.md). Prosjektet kan videre utvides med automatisert
-canary-analyse og leverandørspesifikk infrastrukturkode.
+canary-analyse, DNS-automatisering og leverandørspesifikk infrastrukturkode.

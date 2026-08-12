@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kubelaunch-frontend
+  namespace: ai-demo
+  labels:
+    app.kubernetes.io/name: ai-demo-frontend
+    app.kubernetes.io/part-of: kubelaunch
+spec:
+  secretName: kubelaunch-frontend-tls
+  dnsNames:
+    - kubelaunch.example.com
+  issuerRef:
+    name: production-issuer
+    kind: ClusterIssuer

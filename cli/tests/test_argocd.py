@@ -140,6 +140,26 @@ def test_full_root_builder_uses_both_component_directories() -> None:
     assert "registry.example/backend:v1" in full_patches[2]["patch"]
 
 
+def test_root_builder_adds_configured_tls_ingress_source() -> None:
+    application = build_root_application(
+        "minimal",
+        "https://github.com/example/fork.git",
+        "main",
+        "registry.example/backend:v1",
+        "registry.example/frontend:v1",
+        ingress_hostname="ai.example.com",
+        ingress_class="gce",
+        cluster_issuer="letsencrypt-production",
+    )
+
+    ingress_source = application["spec"]["sources"][1]
+    assert ingress_source["path"] == "profiles/cloud/frontend-ingress"
+    patches = ingress_source["kustomize"]["patches"]
+    assert "ai.example.com" in patches[0]["patch"]
+    assert "gce" in patches[0]["patch"]
+    assert "letsencrypt-production" in patches[1]["patch"]
+
+
 def test_argocd_status_reads_ready_replicas(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = '{"spec":{"replicas":1},"status":{"readyReplicas":1}}'
     monkeypatch.setattr(

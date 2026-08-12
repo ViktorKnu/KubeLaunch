@@ -67,6 +67,27 @@ Tilgang skjer derfor med port-forward eller med et eget ingress-oppsett i
 forken. Lagringsklasse, ressursgrenser, GPU-noder, TLS-issuer og secret backend
 bør også tilpasses den valgte skyleverandøren.
 
+## Valgfri HTTPS-ingress
+
+Bootstrap kan opprette en leverandørnøytral `Ingress` og et cert-manager
+`Certificate` for frontenden. Clusteret må allerede ha:
+
+- en ingress-controller og tilhørende `IngressClass`
+- cert-manager og en fungerende `ClusterIssuer`
+- DNS som peker hostname til ingress-controllerens offentlige adresse
+
+KubeLaunch installerer ingen ingress-controller og oppretter ikke offentlig DNS
+eller en produksjons-issuer. Aktiver overlayet ved å legge til:
+
+```powershell
+  --ingress-hostname ai.example.com `
+  --ingress-class min-ingress-class `
+  --cluster-issuer letsencrypt-production
+```
+
+Alle tre argumentene kreves sammen. Overlayet oppretter TLS-secret
+`kubelaunch-frontend-tls` i `ai-demo` og sender `/` til frontend-servicen.
+
 `kube-launch down` gjelder bare det lokale k3d-clusteret og skal ikke brukes som
 oppryddingskommando for et sky-cluster. Endringer og rollback bør gjøres i Git;
 alternativt kan bootstrap kjøres på nytt med en tidligere immutable revision.

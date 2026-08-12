@@ -113,6 +113,9 @@ def test_bootstrap_existing_cluster_with_repository_override(
                 "backend_image": "registry.example/backend:release-1",
                 "frontend_image": "registry.example/frontend:release-1",
                 "operator_image": "registry.example/operator:release-1",
+                "ingress_hostname": None,
+                "ingress_class": None,
+                "cluster_issuer": None,
             },
         ),
     ]
@@ -157,6 +160,68 @@ def test_full_bootstrap_requires_operator_image() -> None:
 
     assert result.exit_code == 2
     assert "requires --operator-image" in result.output
+
+
+def test_bootstrap_configures_optional_tls_ingress(
+    monkeypatch: pytest.MonkeyPatch,
+    tools_available: None,
+) -> None:
+    applied: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "kube_launch.main.cluster_reachable",
+        lambda context: context == "gke-team",
+    )
+    monkeypatch.setattr("kube_launch.main.install_argocd", lambda context: None)
+    monkeypatch.setattr(
+        "kube_launch.main.apply_root_application",
+        lambda **kwargs: applied.append(kwargs),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "bootstrap",
+            "--context",
+            "gke-team",
+            "--backend-image",
+            "registry.example/backend:v1",
+            "--frontend-image",
+            "registry.example/frontend:v1",
+            "--ingress-hostname",
+            "ai.example.com",
+            "--ingress-class",
+            "gce",
+            "--cluster-issuer",
+            "letsencrypt-production",
+            "--yes",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert applied[0]["ingress_hostname"] == "ai.example.com"
+    assert applied[0]["ingress_class"] == "gce"
+    assert applied[0]["cluster_issuer"] == "letsencrypt-production"
+    assert "Frontend URL: https://ai.example.com" in result.stdout
+
+
+def test_bootstrap_rejects_partial_ingress_configuration() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "bootstrap",
+            "--context",
+            "gke-team",
+            "--backend-image",
+            "registry.example/backend:v1",
+            "--frontend-image",
+            "registry.example/frontend:v1",
+            "--ingress-hostname",
+            "ai.example.com",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "requires --ingress-hostname" in result.output
 
 
 def test_up_requires_exactly_one_profile() -> None:

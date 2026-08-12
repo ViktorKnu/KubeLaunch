@@ -173,6 +173,44 @@ def _aiworkload_image_override(target_image: str) -> dict:
     }
 
 
+def _cloud_ingress_patches(
+    hostname: str,
+    ingress_class: str,
+    cluster_issuer: str,
+) -> list[dict]:
+    return [
+        {
+            "target": {"kind": "Ingress", "name": "kubelaunch-frontend"},
+            "patch": "\n".join(
+                (
+                    "- op: replace",
+                    "  path: /spec/ingressClassName",
+                    f"  value: {json.dumps(ingress_class)}",
+                    "- op: replace",
+                    "  path: /spec/rules/0/host",
+                    f"  value: {json.dumps(hostname)}",
+                    "- op: replace",
+                    "  path: /spec/tls/0/hosts/0",
+                    f"  value: {json.dumps(hostname)}",
+                )
+            ),
+        },
+        {
+            "target": {"kind": "Certificate", "name": "kubelaunch-frontend"},
+            "patch": "\n".join(
+                (
+                    "- op: replace",
+                    "  path: /spec/dnsNames/0",
+                    f"  value: {json.dumps(hostname)}",
+                    "- op: replace",
+                    "  path: /spec/issuerRef/name",
+                    f"  value: {json.dumps(cluster_issuer)}",
+                )
+            ),
+        },
+    ]
+
+
 def build_root_application(
     profile: str,
     repository_url: str,
@@ -180,6 +218,9 @@ def build_root_application(
     backend_image: str,
     frontend_image: str,
     operator_image: str | None = None,
+    ingress_hostname: str | None = None,
+    ingress_class: str | None = None,
+    cluster_issuer: str | None = None,
 ) -> dict:
     """Build a root Application that propagates its Git source to child apps."""
     if profile not in ROOT_APPLICATION_PATHS:
@@ -237,9 +278,28 @@ def build_root_application(
                 },
             }
         )
+    if ingress_hostname:
+        if not ingress_class or not cluster_issuer:
+            raise ArgoCDCommandError(
+                "Ingress requires a class and ClusterIssuer"
+            )
+        sources.append(
+            {
+                "repoURL": repository_url,
+                "targetRevision": revision,
+                "path": "profiles/cloud/frontend-ingress",
+                "kustomize": {
+                    "patches": _cloud_ingress_patches(
+                        ingress_hostname,
+                        ingress_class,
+                        cluster_issuer,
+                    )
+                },
+            }
+        )
     source_spec = (
         {"source": sources[0]}
-        if profile == "minimal"
+        if profile == "minimal" and not ingress_hostname
         else {"sources": sources}
     )
 
@@ -275,6 +335,9 @@ def apply_root_application(
     backend_image: str | None = None,
     frontend_image: str | None = None,
     operator_image: str | None = None,
+    ingress_hostname: str | None = None,
+    ingress_class: str | None = None,
+    cluster_issuer: str | None = None,
 ) -> None:
     """Apply the single root Application after the Argo CD CRD is ready."""
     if manifest is not None and repository_url is not None:
@@ -298,6 +361,9 @@ def apply_root_application(
                 backend_image,
                 frontend_image,
                 operator_image,
+                ingress_hostname,
+                ingress_class,
+                cluster_issuer,
             )
         )
     result = _run(

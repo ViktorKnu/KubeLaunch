@@ -35,6 +35,19 @@ def test_git_applications_are_patchable_by_cloud_bootstrap() -> None:
         assert application["metadata"]["labels"]["kubelaunch.dev/source"] == "git"
 
 
+def test_cloud_frontend_ingress_uses_tls_and_frontend_service() -> None:
+    ingress = load_yaml("profiles/cloud/frontend-ingress/ingress.yaml")
+    certificate = load_yaml("profiles/cloud/frontend-ingress/certificate.yaml")
+    rule = ingress["spec"]["rules"][0]
+    backend = rule["http"]["paths"][0]["backend"]["service"]
+
+    assert ingress["apiVersion"] == "networking.k8s.io/v1"
+    assert ingress["spec"]["tls"][0]["secretName"] == "kubelaunch-frontend-tls"
+    assert backend == {"name": "ai-demo-frontend", "port": {"number": 8080}}
+    assert certificate["spec"]["secretName"] == "kubelaunch-frontend-tls"
+    assert certificate["spec"]["issuerRef"]["kind"] == "ClusterIssuer"
+
+
 def test_smoke_test_application_uses_kustomize_directory() -> None:
     application = load_yaml("platform/components/smoke-test-application.yaml")
 

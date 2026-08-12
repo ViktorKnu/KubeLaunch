@@ -31,7 +31,9 @@ kube-launch bootstrap --help
 ```
 
 Kommandoen endrer ikke aktivt kube-context og oppretter eller sletter ikke
-cluster-infrastruktur. Se [sky-cluster-guiden](../docs/cloud.md).
+cluster-infrastruktur. Den kan valgfritt opprette HTTPS-ingress når ingress-
+controller, cert-manager, `ClusterIssuer` og DNS allerede finnes. Se
+[sky-cluster-guiden](../docs/cloud.md).
 
 `up --minimal` og `up --full` er idempotente og lar et eksisterende cluster være
 i fred. Minimalprofilen installerer MVP-plattformen. Fullprofilen bruker de samme
