@@ -10,6 +10,19 @@ DEFAULT_RUNTIME_URLS = {
 }
 
 
+def rollout_ready_replicas(
+    *,
+    generation: int,
+    observed_generation: int,
+    ready_replicas: int,
+    updated_replicas: int,
+) -> int:
+    """Count ready replicas only after the latest rollout is observed."""
+    if observed_generation < generation:
+        return 0
+    return min(ready_replicas, updated_replicas)
+
+
 def _owner_reference(resource: dict) -> list[dict]:
     metadata = resource["metadata"]
     return [
@@ -44,25 +57,45 @@ def _canary_labels(name: str) -> dict[str, str]:
     }
 
 
-def build_status(resource: dict) -> dict:
-    """Build the observed status without changing the source resource."""
+def _ready_condition(name: str, ready: bool) -> dict[str, str]:
+    return {
+        "type": name,
+        "status": "True" if ready else "False",
+        "reason": "MinimumReplicasAvailable" if ready else "ReplicasUnavailable",
+    }
+
+
+def build_status(
+    resource: dict,
+    stable_ready_replicas: int = 0,
+    canary_ready_replicas: int = 0,
+) -> dict:
+    """Build readiness analysis without changing the source resource."""
     metadata = resource["metadata"]
     name = metadata["name"]
+    stable_replicas = resource["spec"].get("replicas", 1)
+    stable_ready = stable_ready_replicas >= stable_replicas
     status = {
-        "phase": "Reconciled",
+        "phase": "Ready" if stable_ready else "Progressing",
         "observedGeneration": metadata.get("generation", 0),
         "deploymentName": name,
         "serviceName": name,
         "model": resource["spec"]["model"],
         "runtime": resource["spec"].get("runtime", DEFAULT_RUNTIME),
+        "stableReadyReplicas": stable_ready_replicas,
+        "conditions": [_ready_condition("StableReady", stable_ready)],
     }
     canary = resource["spec"].get("canary")
     if canary:
-        stable_replicas = resource["spec"].get("replicas", 1)
         canary_replicas = canary.get("replicas", 1)
+        canary_ready = canary_ready_replicas >= canary_replicas
         status.update(
             {
-                "phase": "Canary",
+                "phase": (
+                    "CanaryReady"
+                    if stable_ready and canary_ready
+                    else "CanaryProgressing"
+                ),
                 "canaryDeploymentName": f"{name}-canary",
                 "canaryModel": canary["model"],
                 "canaryRuntime": canary.get(
@@ -73,14 +106,26 @@ def build_status(resource: dict) -> dict:
                     / (stable_replicas + canary_replicas)
                     * 100
                 ),
+                "canaryReadyReplicas": canary_ready_replicas,
             }
+        )
+        status["conditions"].append(
+            _ready_condition("CanaryReady", canary_ready)
         )
     return status
 
 
-def build_status_patch(resource: dict) -> dict | None:
+def build_status_patch(
+    resource: dict,
+    stable_ready_replicas: int = 0,
+    canary_ready_replicas: int = 0,
+) -> dict | None:
     """Build an idempotent status patch and clear fields from an old canary."""
-    desired_status = build_status(resource)
+    desired_status = build_status(
+        resource,
+        stable_ready_replicas,
+        canary_ready_replicas,
+    )
     current_status = resource.get("status", {})
     if current_status == desired_status:
         return None

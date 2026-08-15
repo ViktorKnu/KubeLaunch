@@ -355,6 +355,7 @@ def test_aiworkload_crd_has_status_and_defaults() -> None:
     crd = load_yaml("apps/aiworkload-operator/k8s/crd.yaml")
     version = crd["spec"]["versions"][0]
     spec_schema = version["schema"]["openAPIV3Schema"]["properties"]["spec"]
+    status_schema = version["schema"]["openAPIV3Schema"]["properties"]["status"]
 
     assert crd["metadata"]["name"] == "aiworkloads.platform.kubelaunch.dev"
     assert crd["spec"]["scope"] == "Namespaced"
@@ -382,6 +383,9 @@ def test_aiworkload_crd_has_status_and_defaults() -> None:
     }
     assert spec_schema["properties"]["replicas"]["default"] == 1
     assert spec_schema["properties"]["replicas"]["maximum"] == 5
+    condition_schema = status_schema["properties"]["conditions"]["items"]
+    assert condition_schema["required"] == ["type", "status", "reason"]
+    assert condition_schema["properties"]["status"]["enum"] == ["True", "False"]
 
 
 def test_aiworkload_operator_has_required_rbac() -> None:
@@ -401,6 +405,7 @@ def test_aiworkload_operator_has_required_rbac() -> None:
     assert deployment["spec"]["template"]["spec"]["serviceAccountName"] == (
         "aiworkload-operator"
     )
+    assert all("watch" not in rule["verbs"] for rule in role["rules"])
 
 
 def test_full_profile_deploys_operator_before_example() -> None:

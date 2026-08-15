@@ -27,5 +27,7 @@ demo og en `AIWorkload`-operator lagt til. Operator-workloads kan nå bruke båd
 Ollama og et OpenAI-kompatibelt vLLM-endepunkt, samt kjøre replica-basert canary
 med en separat Deployment. Et eksisterende Kubernetes-cluster kan nå bootstrappes
 med eksplisitt context, Git-kilde og registry-images; se
-[sky-cluster-guiden](cloud.md). Prosjektet kan videre utvides med automatisert
-canary-analyse, DNS-automatisering og leverandørspesifikk infrastrukturkode.
+[sky-cluster-guiden](cloud.md). Canary-operatoren analyserer nå Deployment-
+readiness periodisk og rapporterer conditions uten å auto-promotere. Prosjektet
+kan videre utvides med metrikkbasert modell-/feilrateanalyse, DNS-automatisering
+og leverandørspesifikk infrastrukturkode.

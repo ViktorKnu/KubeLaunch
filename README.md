@@ -241,6 +241,11 @@ Følg utrullingen med `make aiworkload-status`. Promoter ved å flytte canary-
 verdiene til hovedfeltene og fjerne `spec.canary`; operatoren fjerner da canary-
 Deploymenten.
 
+Operatoren sjekker readiness hvert 15. sekund og rapporterer
+`CanaryProgressing` eller `CanaryReady`, sammen med conditions og antall klare
+replikaer. Den promoterer aldri automatisk: readiness sier at utrullingen er
+teknisk klar, ikke at den nye modellen gir gode svar eller lav feilrate.
+
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten
 før Prometheus, KEDA og Ollama legges til.

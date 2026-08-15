@@ -41,6 +41,13 @@ Se [examples/canary.yaml](examples/canary.yaml). Promoter en canary ved å kopie
 verdiene til hovedfeltene og fjerne `spec.canary`. Operatoren sletter da canary-
 Deploymenten og rydder canary-feltene fra status.
 
+Operatoren analyserer Deployment-readiness hvert 15. sekund. Status er
+`CanaryProgressing` frem til både stabil og canary har ønsket antall oppdaterte,
+klare replikaer, og endres deretter til `CanaryReady`. Conditions
+`StableReady` og `CanaryReady` forklarer hvilken del som eventuelt mangler.
+Dette er en rollout-sikkerhetssjekk, ikke automatisk promotering eller analyse
+av modellkvalitet og feilrate.
+
 Eksempelet [examples/vllm.yaml](examples/vllm.yaml) viser kobling mot en vLLM-
 server. KubeLaunch installerer ikke vLLM automatisk, siden praktisk lokal
 kjøring normalt krever et vesentlig tyngre modell- og maskinvareoppsett enn

@@ -112,6 +112,10 @@ spec:
                   type: string
                 runtime:
                   type: string
+                stableReadyReplicas:
+                  type: integer
+                canaryReadyReplicas:
+                  type: integer
                 canaryDeploymentName:
                   type: string
                 canaryModel:
@@ -120,3 +124,21 @@ spec:
                   type: string
                 estimatedCanaryTrafficPercent:
                   type: integer
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                      - reason
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                      reason:
+                        type: string

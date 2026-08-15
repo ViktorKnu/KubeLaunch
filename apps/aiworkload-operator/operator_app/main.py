@@ -3,7 +3,7 @@
 import logging
 import time
 
-from kubernetes import client, config, watch
+from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
 
 from operator_app.workload import (
@@ -11,12 +11,14 @@ from operator_app.workload import (
     build_deployment,
     build_service,
     build_status_patch,
+    rollout_ready_replicas,
 )
 
 GROUP = "platform.kubelaunch.dev"
 VERSION = "v1alpha1"
 PLURAL = "aiworkloads"
 LOGGER = logging.getLogger(__name__)
+POLL_INTERVAL_SECONDS = 15
 
 
 def _upsert_deployment(api: client.AppsV1Api, desired: dict) -> None:
@@ -54,6 +56,20 @@ def _delete_deployment(api: client.AppsV1Api, *, name: str, namespace: str) -> N
             raise
 
 
+def _ready_replicas(api: client.AppsV1Api, *, name: str, namespace: str) -> int:
+    deployment = api.read_namespaced_deployment(name=name, namespace=namespace)
+    generation = int(deployment.metadata.generation or 0)
+    observed_generation = int(deployment.status.observed_generation or 0)
+    ready_replicas = int(deployment.status.ready_replicas or 0)
+    updated_replicas = int(deployment.status.updated_replicas or 0)
+    return rollout_ready_replicas(
+        generation=generation,
+        observed_generation=observed_generation,
+        ready_replicas=ready_replicas,
+        updated_replicas=updated_replicas,
+    )
+
+
 def reconcile(
     resource: dict,
     apps_api: client.AppsV1Api,
@@ -66,9 +82,20 @@ def reconcile(
     name = metadata["name"]
 
     _upsert_deployment(apps_api, build_deployment(resource))
+    stable_ready_replicas = _ready_replicas(
+        apps_api,
+        name=name,
+        namespace=namespace,
+    )
     canary_deployment = build_canary_deployment(resource)
+    canary_ready_replicas = 0
     if canary_deployment:
         _upsert_deployment(apps_api, canary_deployment)
+        canary_ready_replicas = _ready_replicas(
+            apps_api,
+            name=f"{name}-canary",
+            namespace=namespace,
+        )
     else:
         _delete_deployment(
             apps_api,
@@ -76,7 +103,11 @@ def reconcile(
             namespace=namespace,
         )
     _upsert_service(core_api, build_service(resource))
-    status_patch = build_status_patch(resource)
+    status_patch = build_status_patch(
+        resource,
+        stable_ready_replicas,
+        canary_ready_replicas,
+    )
     if status_patch is not None:
         custom_api.patch_namespaced_custom_object_status(
             group=GROUP,
@@ -90,7 +121,7 @@ def reconcile(
 
 
 def run() -> None:
-    """Run the resilient cluster-wide AIWorkload watch loop."""
+    """Run the resilient cluster-wide AIWorkload analysis loop."""
     logging.basicConfig(level=logging.INFO)
     config.load_incluster_config()
     apps_api = client.AppsV1Api()
@@ -98,20 +129,28 @@ def run() -> None:
     custom_api = client.CustomObjectsApi()
 
     while True:
-        stream = watch.Watch()
         try:
-            for event in stream.stream(
-                custom_api.list_cluster_custom_object,
+            response = custom_api.list_cluster_custom_object(
                 group=GROUP,
                 version=VERSION,
                 plural=PLURAL,
-                timeout_seconds=60,
-            ):
-                if event["type"] in {"ADDED", "MODIFIED"}:
-                    reconcile(event["object"], apps_api, core_api, custom_api)
+            )
         except Exception:
-            LOGGER.exception("AIWorkload watch failed; retrying")
-            time.sleep(5)
+            LOGGER.exception("Could not list AIWorkloads; retrying")
+            time.sleep(POLL_INTERVAL_SECONDS)
+            continue
+
+        for resource in response.get("items", []):
+            try:
+                reconcile(resource, apps_api, core_api, custom_api)
+            except Exception:
+                metadata = resource.get("metadata", {})
+                LOGGER.exception(
+                    "Could not reconcile AIWorkload %s/%s",
+                    metadata.get("namespace", "unknown"),
+                    metadata.get("name", "unknown"),
+                )
+        time.sleep(POLL_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

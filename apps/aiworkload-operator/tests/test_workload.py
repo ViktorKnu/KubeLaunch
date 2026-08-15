@@ -4,6 +4,7 @@ from operator_app.workload import (
     build_service,
     build_status,
     build_status_patch,
+    rollout_ready_replicas,
 )
 
 
@@ -24,6 +25,21 @@ def aiworkload() -> dict:
             "replicas": 2,
         },
     }
+
+
+def test_rollout_readiness_rejects_stale_and_old_replicas() -> None:
+    assert rollout_ready_replicas(
+        generation=4,
+        observed_generation=3,
+        ready_replicas=2,
+        updated_replicas=2,
+    ) == 0
+    assert rollout_ready_replicas(
+        generation=4,
+        observed_generation=4,
+        ready_replicas=3,
+        updated_replicas=1,
+    ) == 1
 
 
 def test_build_deployment_maps_aiworkload_spec() -> None:
@@ -103,13 +119,21 @@ def test_vllm_uses_openai_compatible_service_by_default() -> None:
 
 
 def test_status_records_the_observed_generation() -> None:
-    assert build_status(aiworkload()) == {
-        "phase": "Reconciled",
+    assert build_status(aiworkload(), stable_ready_replicas=2) == {
+        "phase": "Ready",
         "observedGeneration": 3,
         "deploymentName": "demo",
         "serviceName": "demo",
         "model": "tinyllama",
         "runtime": "ollama",
+        "stableReadyReplicas": 2,
+        "conditions": [
+            {
+                "type": "StableReady",
+                "status": "True",
+                "reason": "MinimumReplicasAvailable",
+            }
+        ],
     }
 
 
@@ -146,13 +170,42 @@ def test_canary_status_reports_replica_based_traffic_share() -> None:
         "replicas": 1,
     }
 
-    status = build_status(resource)
+    status = build_status(
+        resource,
+        stable_ready_replicas=2,
+        canary_ready_replicas=1,
+    )
 
-    assert status["phase"] == "Canary"
+    assert status["phase"] == "CanaryReady"
     assert status["canaryDeploymentName"] == "demo-canary"
     assert status["canaryModel"] == "qwen2:0.5b"
     assert status["canaryRuntime"] == "vllm"
     assert status["estimatedCanaryTrafficPercent"] == 33
+    assert status["stableReadyReplicas"] == 2
+    assert status["canaryReadyReplicas"] == 1
+    assert [condition["status"] for condition in status["conditions"]] == [
+        "True",
+        "True",
+    ]
+
+
+def test_canary_status_stays_progressing_until_both_deployments_are_ready() -> None:
+    resource = aiworkload()
+    resource["spec"]["canary"] = {"model": "qwen2:0.5b", "replicas": 1}
+
+    status = build_status(
+        resource,
+        stable_ready_replicas=2,
+        canary_ready_replicas=0,
+    )
+
+    assert status["phase"] == "CanaryProgressing"
+    assert status["conditions"][0]["status"] == "True"
+    assert status["conditions"][1] == {
+        "type": "CanaryReady",
+        "status": "False",
+        "reason": "ReplicasUnavailable",
+    }
 
 
 def test_status_patch_clears_removed_canary_fields() -> None:
@@ -166,7 +219,7 @@ def test_status_patch_clears_removed_canary_fields() -> None:
     patch = build_status_patch(resource)
 
     assert patch is not None
-    assert patch["phase"] == "Reconciled"
+    assert patch["phase"] == "Progressing"
     assert patch["canaryDeploymentName"] is None
     assert patch["canaryModel"] is None
     assert patch["estimatedCanaryTrafficPercent"] is None
