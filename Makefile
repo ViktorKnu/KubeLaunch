@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status secret-status aiworkload-status vault ollama backend-image backend frontend-image frontend operator-image test lint validate
+.PHONY: help setup up full status down grafana keda-load keda-status backend-scale-status cert-status secret-status aiworkload-status canary-analysis-status vault ollama backend-image backend frontend-image frontend operator-image test lint validate
 
 help: ## Show available development tasks
 	@echo "KubeLaunch development tasks"
@@ -17,6 +17,7 @@ help: ## Show available development tasks
 	@echo "  make cert-status Show cert-manager certificate resources"
 	@echo "  make secret-status Show External Secrets resources"
 	@echo "  make aiworkload-status Show AIWorkload and generated resources"
+	@echo "  make canary-analysis-status Show canary monitoring and alert rules"
 	@echo "  make vault      Forward local dev Vault to http://localhost:8200"
 	@echo "  make ollama     Forward Ollama to http://localhost:11434"
 	@echo "  make backend-image Build and import the backend image into k3d"
@@ -63,6 +64,9 @@ secret-status:
 
 aiworkload-status:
 	kubectl --context k3d-kubelaunch --namespace ai-workloads get aiworkload,deployment,service
+
+canary-analysis-status:
+	kubectl --context k3d-kubelaunch --namespace ai-workloads get servicemonitor,prometheusrule
 
 vault:
 	kubectl --context k3d-kubelaunch --namespace vault port-forward service/vault 8200:8200

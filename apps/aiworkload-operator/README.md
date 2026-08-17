@@ -46,7 +46,26 @@ Operatoren analyserer Deployment-readiness hvert 15. sekund. Status er
 klare replikaer, og endres deretter til `CanaryReady`. Conditions
 `StableReady` og `CanaryReady` forklarer hvilken del som eventuelt mangler.
 Dette er en rollout-sikkerhetssjekk, ikke automatisk promotering eller analyse
-av modellkvalitet og feilrate.
+av modellkvalitet.
+
+Når canary finnes, oppretter operatoren også en `ServiceMonitor` og en
+`PrometheusRule`. Backenden merker metrics med `model`, `runtime` og `track`, og
+regelen varsler når canary-feilraten overstiger terskelen. Standard er mer enn
+5 prosent feil over 5 minutter i minst 2 minutter:
+
+```yaml
+canary:
+  model: qwen2:0.5b
+  analysis:
+    enabled: true
+    maxErrorRatePercent: 5
+    windowMinutes: 5
+    forMinutes: 2
+```
+
+Sett `enabled: false` for å beholde readinessanalysen uten feilratealert.
+Alerten blokkerer eller promoterer ikke automatisk; den gir et eksplisitt signal
+som må vurderes før canary-verdiene flyttes til hovedfeltene.
 
 Eksempelet [examples/vllm.yaml](examples/vllm.yaml) viser kobling mot en vLLM-
 server. KubeLaunch installerer ikke vLLM automatisk, siden praktisk lokal

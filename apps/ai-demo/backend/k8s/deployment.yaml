@@ -28,6 +28,8 @@ spec:
               value: http://ollama.ollama.svc.cluster.local:11434
             - name: AI_MODEL
               value: tinyllama
+            - name: AI_TRACK
+              value: stable
             - name: AI_TIMEOUT_SECONDS
               value: "120"
           ports:

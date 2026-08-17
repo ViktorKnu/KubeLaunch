@@ -246,6 +246,12 @@ Operatoren sjekker readiness hvert 15. sekund og rapporterer
 replikaer. Den promoterer aldri automatisk: readiness sier at utrullingen er
 teknisk klar, ikke at den nye modellen gir gode svar eller lav feilrate.
 
+For hver operatorstyrte workload opprettes en `ServiceMonitor`. Når canary er
+aktiv, opprettes også en `PrometheusRule` som varsler ved høy canary-feilrate.
+Terskel, målevindu og varighet konfigureres under `spec.canary.analysis`.
+Kontroller ressursene med `make canary-analysis-status`. Alerten gir et signal,
+men foretar aldri automatisk promotering eller rollback.
+
 Den første child Application er `platform-smoke-test`. Den kjører én liten
 nginx-pod i `kubelaunch-system` og gjør det mulig å bekrefte hele GitOps-flyten
 før Prometheus, KEDA og Ollama legges til.

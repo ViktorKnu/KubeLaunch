@@ -23,6 +23,7 @@ AI_RUNTIME_BASE_URL = os.getenv(
     os.getenv("OLLAMA_BASE_URL", "http://ollama.ollama.svc.cluster.local:11434"),
 )
 AI_MODEL = os.getenv("AI_MODEL", os.getenv("OLLAMA_MODEL", "tinyllama"))
+AI_TRACK = os.getenv("AI_TRACK", "stable")
 AI_TIMEOUT_SECONDS = float(
     os.getenv("AI_TIMEOUT_SECONDS", os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
 )
@@ -35,19 +36,26 @@ if AI_RUNTIME not in SUPPORTED_RUNTIMES:
 PROMPT_REQUESTS = Counter(
     "kubelaunch_prompt_requests_total",
     "Number of prompts handled by the AI demo backend.",
-    labelnames=("status",),
+    labelnames=("status", "model", "runtime", "track"),
 )
 PROMPT_DURATION = Histogram(
     "kubelaunch_prompt_duration_seconds",
     "Time spent waiting for an AI runtime prompt response.",
+    labelnames=("model", "runtime", "track"),
     buckets=(0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120),
 )
 PROMPT_IN_PROGRESS = Gauge(
     "kubelaunch_prompt_requests_in_progress",
     "Number of prompts currently waiting for an AI runtime response.",
+    labelnames=("model", "runtime", "track"),
 )
+METRIC_LABELS = {
+    "model": AI_MODEL,
+    "runtime": AI_RUNTIME,
+    "track": AI_TRACK,
+}
 for metric_status in ("success", "error"):
-    PROMPT_REQUESTS.labels(status=metric_status)
+    PROMPT_REQUESTS.labels(status=metric_status, **METRIC_LABELS)
 
 
 class PromptRequest(BaseModel):
@@ -151,7 +159,8 @@ async def prompt(
     """Send one non-streaming prompt to the runtime and return its answer."""
     started_at = time.perf_counter()
     metric_status = "error"
-    PROMPT_IN_PROGRESS.inc()
+    in_progress_metric = PROMPT_IN_PROGRESS.labels(**METRIC_LABELS)
+    in_progress_metric.inc()
     try:
         path, runtime_payload = build_runtime_request(payload.prompt)
         response = await client.post(path, json=runtime_payload)
@@ -167,9 +176,9 @@ async def prompt(
         ) from error
     finally:
         elapsed_seconds = time.perf_counter() - started_at
-        PROMPT_IN_PROGRESS.dec()
-        PROMPT_REQUESTS.labels(status=metric_status).inc()
-        PROMPT_DURATION.observe(elapsed_seconds)
+        in_progress_metric.dec()
+        PROMPT_REQUESTS.labels(status=metric_status, **METRIC_LABELS).inc()
+        PROMPT_DURATION.labels(**METRIC_LABELS).observe(elapsed_seconds)
 
     return PromptResponse(
         answer=answer,

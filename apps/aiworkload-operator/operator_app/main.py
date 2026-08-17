@@ -8,8 +8,10 @@ from kubernetes.client.exceptions import ApiException
 
 from operator_app.workload import (
     build_canary_deployment,
+    build_canary_prometheus_rule,
     build_deployment,
     build_service,
+    build_service_monitor,
     build_status_patch,
     rollout_ready_replicas,
 )
@@ -19,6 +21,8 @@ VERSION = "v1alpha1"
 PLURAL = "aiworkloads"
 LOGGER = logging.getLogger(__name__)
 POLL_INTERVAL_SECONDS = 15
+MONITORING_GROUP = "monitoring.coreos.com"
+MONITORING_VERSION = "v1"
 
 
 def _upsert_deployment(api: client.AppsV1Api, desired: dict) -> None:
@@ -51,6 +55,63 @@ def _upsert_service(api: client.CoreV1Api, desired: dict) -> None:
 def _delete_deployment(api: client.AppsV1Api, *, name: str, namespace: str) -> None:
     try:
         api.delete_namespaced_deployment(name=name, namespace=namespace)
+    except ApiException as error:
+        if error.status != 404:
+            raise
+
+
+def _upsert_monitoring_resource(
+    api: client.CustomObjectsApi,
+    *,
+    plural: str,
+    desired: dict,
+) -> None:
+    namespace = desired["metadata"]["namespace"]
+    name = desired["metadata"]["name"]
+    try:
+        api.get_namespaced_custom_object(
+            group=MONITORING_GROUP,
+            version=MONITORING_VERSION,
+            namespace=namespace,
+            plural=plural,
+            name=name,
+        )
+    except ApiException as error:
+        if error.status != 404:
+            raise
+        api.create_namespaced_custom_object(
+            group=MONITORING_GROUP,
+            version=MONITORING_VERSION,
+            namespace=namespace,
+            plural=plural,
+            body=desired,
+        )
+    else:
+        api.patch_namespaced_custom_object(
+            group=MONITORING_GROUP,
+            version=MONITORING_VERSION,
+            namespace=namespace,
+            plural=plural,
+            name=name,
+            body=desired,
+        )
+
+
+def _delete_monitoring_resource(
+    api: client.CustomObjectsApi,
+    *,
+    plural: str,
+    name: str,
+    namespace: str,
+) -> None:
+    try:
+        api.delete_namespaced_custom_object(
+            group=MONITORING_GROUP,
+            version=MONITORING_VERSION,
+            namespace=namespace,
+            plural=plural,
+            name=name,
+        )
     except ApiException as error:
         if error.status != 404:
             raise
@@ -103,6 +164,25 @@ def reconcile(
             namespace=namespace,
         )
     _upsert_service(core_api, build_service(resource))
+    _upsert_monitoring_resource(
+        custom_api,
+        plural="servicemonitors",
+        desired=build_service_monitor(resource),
+    )
+    prometheus_rule = build_canary_prometheus_rule(resource)
+    if prometheus_rule:
+        _upsert_monitoring_resource(
+            custom_api,
+            plural="prometheusrules",
+            desired=prometheus_rule,
+        )
+    else:
+        _delete_monitoring_resource(
+            custom_api,
+            plural="prometheusrules",
+            name=f"{name}-canary",
+            namespace=namespace,
+        )
     status_patch = build_status_patch(
         resource,
         stable_ready_replicas,

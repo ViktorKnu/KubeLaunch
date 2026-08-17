@@ -174,6 +174,7 @@ def test_ai_backend_connects_to_ollama_and_includes_keda() -> None:
     assert deployment["spec"]["replicas"] == 1
     assert container["image"] == "kubelaunch-backend:dev"
     assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_TRACK"] == "stable"
     assert environment["AI_RUNTIME_BASE_URL"] == (
         "http://ollama.ollama.svc.cluster.local:11434"
     )
@@ -381,6 +382,27 @@ def test_aiworkload_crd_has_status_and_defaults() -> None:
         "maximum": 5,
         "default": 1,
     }
+    assert canary_schema["properties"]["analysis"]["properties"] == {
+        "enabled": {"type": "boolean", "default": True},
+        "maxErrorRatePercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 5,
+        },
+        "windowMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 5,
+        },
+        "forMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 2,
+        },
+    }
     assert spec_schema["properties"]["replicas"]["default"] == 1
     assert spec_schema["properties"]["replicas"]["maximum"] == 5
     condition_schema = status_schema["properties"]["conditions"]["items"]
@@ -398,9 +420,14 @@ def test_aiworkload_operator_has_required_rbac() -> None:
     }
     container = deployment["spec"]["template"]["spec"]["containers"][0]
 
-    assert {"aiworkloads", "aiworkloads/status", "deployments", "services"} <= (
-        resources
-    )
+    assert {
+        "aiworkloads",
+        "aiworkloads/status",
+        "deployments",
+        "services",
+        "servicemonitors",
+        "prometheusrules",
+    } <= resources
     assert container["image"] == "kubelaunch-aiworkload-operator:dev"
     assert deployment["spec"]["template"]["spec"]["serviceAccountName"] == (
         "aiworkload-operator"

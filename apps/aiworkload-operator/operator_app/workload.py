@@ -1,5 +1,7 @@
 """Pure Kubernetes resource builders for AIWorkload reconciliation."""
 
+import json
+
 API_VERSION = "platform.kubelaunch.dev/v1alpha1"
 KIND = "AIWorkload"
 DEFAULT_IMAGE = "kubelaunch-backend:dev"
@@ -109,6 +111,8 @@ def build_status(
                 "canaryReadyReplicas": canary_ready_replicas,
             }
         )
+        if canary.get("analysis", {}).get("enabled", True):
+            status["analysisRuleName"] = f"{name}-canary"
         status["conditions"].append(
             _ready_condition("CanaryReady", canary_ready)
         )
@@ -145,6 +149,7 @@ def _build_backend_deployment(
     runtime: str,
     runtime_url: str,
     model: str,
+    track: str,
 ) -> dict:
     metadata = resource["metadata"]
 
@@ -179,6 +184,7 @@ def _build_backend_deployment(
                                     "value": runtime_url,
                                 },
                                 {"name": "AI_MODEL", "value": model},
+                                {"name": "AI_TRACK", "value": track},
                                 {
                                     "name": "AI_TIMEOUT_SECONDS",
                                     "value": "120",
@@ -230,6 +236,7 @@ def build_deployment(resource: dict) -> dict:
         runtime=runtime,
         runtime_url=spec.get("runtimeURL", DEFAULT_RUNTIME_URLS[runtime]),
         model=spec["model"],
+        track="stable",
     )
 
 
@@ -260,6 +267,7 @@ def build_canary_deployment(resource: dict) -> dict | None:
         runtime=runtime,
         runtime_url=runtime_url,
         model=canary["model"],
+        track="canary",
     )
 
 
@@ -285,5 +293,92 @@ def build_service(resource: dict) -> dict:
         "spec": {
             "selector": {selector_label: name},
             "ports": [{"name": "http", "port": 8000, "targetPort": "http"}],
+        },
+    }
+
+
+def build_service_monitor(resource: dict) -> dict:
+    """Build Prometheus discovery for an operator-managed backend Service."""
+    metadata = resource["metadata"]
+    name = metadata["name"]
+    return {
+        "apiVersion": "monitoring.coreos.com/v1",
+        "kind": "ServiceMonitor",
+        "metadata": {
+            "name": name,
+            "namespace": metadata["namespace"],
+            "labels": {**_labels(name), "release": "observability"},
+            "ownerReferences": _owner_reference(resource),
+        },
+        "spec": {
+            "selector": {
+                "matchLabels": {"app.kubernetes.io/name": name},
+            },
+            "endpoints": [
+                {"port": "http", "path": "/metrics", "interval": "15s"}
+            ],
+        },
+    }
+
+
+def build_canary_prometheus_rule(resource: dict) -> dict | None:
+    """Build the optional canary error-rate alert managed by Prometheus."""
+    metadata = resource["metadata"]
+    canary = resource["spec"].get("canary")
+    if not canary:
+        return None
+    analysis = canary.get("analysis", {})
+    if analysis.get("enabled", True) is False:
+        return None
+
+    name = metadata["name"]
+    namespace = metadata["namespace"]
+    window_minutes = analysis.get("windowMinutes", 5)
+    threshold = analysis.get("maxErrorRatePercent", 5)
+    duration_minutes = analysis.get("forMinutes", 2)
+    selector = (
+        f'namespace={json.dumps(namespace)},track="canary"'
+    )
+    error_selector = f'{selector},status="error"'
+    expression = (
+        "100 * "
+        f"sum(rate(kubelaunch_prompt_requests_total{{{error_selector}}}"
+        f"[{window_minutes}m])) / "
+        "clamp_min("
+        f"sum(rate(kubelaunch_prompt_requests_total{{{selector}}}"
+        f"[{window_minutes}m])), 0.001) > {threshold}"
+    )
+    return {
+        "apiVersion": "monitoring.coreos.com/v1",
+        "kind": "PrometheusRule",
+        "metadata": {
+            "name": f"{name}-canary",
+            "namespace": namespace,
+            "labels": {**_labels(name), "release": "observability"},
+            "ownerReferences": _owner_reference(resource),
+        },
+        "spec": {
+            "groups": [
+                {
+                    "name": f"{name}.canary",
+                    "rules": [
+                        {
+                            "alert": "KubeLaunchCanaryHighErrorRate",
+                            "expr": expression,
+                            "for": f"{duration_minutes}m",
+                            "labels": {
+                                "severity": "warning",
+                                "aiworkload": name,
+                            },
+                            "annotations": {
+                                "summary": (
+                                    f"Canary error rate is above {threshold}% "
+                                    f"for AIWorkload {namespace}/{name}"
+                                )
+                            },
+                        }
+                    ],
+                }
+            ]
         },
     }

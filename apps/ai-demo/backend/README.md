@@ -10,6 +10,10 @@ Runtime konfigureres med `AI_RUNTIME`, `AI_RUNTIME_BASE_URL`, `AI_MODEL` og
 endepunktet krever Bearer-autentisering. De gamle `OLLAMA_*`-variablene støttes
 fortsatt som fallback.
 
+Prometheus-metrics har labelene `model`, `runtime` og `track`. Operatoren setter
+`track` til `stable` eller `canary`, slik at feilrate kan analyseres separat uten
+å endre backend-API-et.
+
 KEDA skalerer backenden mellom én og tre replikaer basert på Prometheus-metrikken
 `kubelaunch_prompt_requests_in_progress`. Hver replika sikter mot maksimalt én
 aktiv prompt om gangen. Ollama skaleres ikke.

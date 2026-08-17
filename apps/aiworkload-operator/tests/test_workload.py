@@ -1,7 +1,9 @@
 from operator_app.workload import (
     build_canary_deployment,
+    build_canary_prometheus_rule,
     build_deployment,
     build_service,
+    build_service_monitor,
     build_status,
     build_status_patch,
     rollout_ready_replicas,
@@ -53,6 +55,7 @@ def test_build_deployment_maps_aiworkload_spec() -> None:
     assert container["image"] == "example/backend:v1"
     assert environment["AI_RUNTIME"] == "ollama"
     assert environment["AI_MODEL"] == "tinyllama"
+    assert environment["AI_TRACK"] == "stable"
     assert environment["AI_RUNTIME_BASE_URL"] == "http://ollama.example:11434"
 
 
@@ -97,6 +100,7 @@ def test_defaults_use_local_backend_and_ollama() -> None:
     assert deployment["spec"]["replicas"] == 1
     assert container["image"] == "kubelaunch-backend:dev"
     assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_TRACK"] == "stable"
     assert environment["AI_RUNTIME_BASE_URL"] == (
         "http://ollama.ollama.svc.cluster.local:11434"
     )
@@ -159,6 +163,7 @@ def test_canary_deployment_shares_service_without_overlapping_selectors() -> Non
     assert container["image"] == "example/backend:v1"
     assert environment["AI_MODEL"] == "qwen2:0.5b"
     assert environment["AI_RUNTIME"] == "ollama"
+    assert environment["AI_TRACK"] == "canary"
     assert environment["AI_RUNTIME_BASE_URL"] == "http://ollama.example:11434"
 
 
@@ -183,6 +188,7 @@ def test_canary_status_reports_replica_based_traffic_share() -> None:
     assert status["estimatedCanaryTrafficPercent"] == 33
     assert status["stableReadyReplicas"] == 2
     assert status["canaryReadyReplicas"] == 1
+    assert status["analysisRuleName"] == "demo-canary"
     assert [condition["status"] for condition in status["conditions"]] == [
         "True",
         "True",
@@ -223,3 +229,50 @@ def test_status_patch_clears_removed_canary_fields() -> None:
     assert patch["canaryDeploymentName"] is None
     assert patch["canaryModel"] is None
     assert patch["estimatedCanaryTrafficPercent"] is None
+
+
+def test_service_monitor_discovers_generated_backend() -> None:
+    monitor = build_service_monitor(aiworkload())
+
+    assert monitor["kind"] == "ServiceMonitor"
+    assert monitor["metadata"]["labels"]["release"] == "observability"
+    assert monitor["spec"]["selector"]["matchLabels"] == {
+        "app.kubernetes.io/name": "demo"
+    }
+    assert monitor["spec"]["endpoints"] == [
+        {"port": "http", "path": "/metrics", "interval": "15s"}
+    ]
+
+
+def test_canary_rule_alerts_on_configured_error_rate() -> None:
+    resource = aiworkload()
+    resource["spec"]["canary"] = {
+        "model": "qwen2:0.5b",
+        "analysis": {
+            "maxErrorRatePercent": 10,
+            "windowMinutes": 3,
+            "forMinutes": 4,
+        },
+    }
+
+    prometheus_rule = build_canary_prometheus_rule(resource)
+
+    assert prometheus_rule is not None
+    rule = prometheus_rule["spec"]["groups"][0]["rules"][0]
+    assert rule["alert"] == "KubeLaunchCanaryHighErrorRate"
+    assert 'namespace="ai-workloads",track="canary"' in rule["expr"]
+    assert 'status="error"' in rule["expr"]
+    assert "[3m]" in rule["expr"]
+    assert rule["expr"].endswith("> 10")
+    assert rule["for"] == "4m"
+
+
+def test_canary_analysis_can_be_disabled() -> None:
+    resource = aiworkload()
+    resource["spec"]["canary"] = {
+        "model": "qwen2:0.5b",
+        "analysis": {"enabled": False},
+    }
+
+    assert build_canary_prometheus_rule(resource) is None
+    assert "analysisRuleName" not in build_status(resource)

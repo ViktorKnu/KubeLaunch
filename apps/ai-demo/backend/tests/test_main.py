@@ -118,3 +118,6 @@ def test_metrics_expose_prompt_counter() -> None:
     assert "kubelaunch_prompt_requests_total" in response.text
     assert "kubelaunch_prompt_duration_seconds" in response.text
     assert "kubelaunch_prompt_requests_in_progress" in response.text
+    assert 'model="tinyllama"' in response.text
+    assert 'runtime="ollama"' in response.text
+    assert 'track="stable"' in response.text
